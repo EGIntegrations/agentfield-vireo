@@ -133,7 +133,11 @@ class BrainClient:
 
         new_headers = self._build_event_stream_headers(source_headers)
 
-        if not new_headers and source_headers is None and self._current_workflow_context:
+        if (
+            not new_headers
+            and source_headers is None
+            and self._current_workflow_context
+        ):
             try:
                 context_headers = self._current_workflow_context.to_headers()
             except Exception:

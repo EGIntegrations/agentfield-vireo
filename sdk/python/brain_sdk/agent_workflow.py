@@ -38,9 +38,7 @@ class AgentWorkflow:
         reasoner_name = getattr(original_func, "__name__", "reasoner")
 
         parent_context = self._get_parent_context()
-        execution_context = self._build_execution_context(
-            reasoner_name, parent_context
-        )
+        execution_context = self._build_execution_context(reasoner_name, parent_context)
 
         # Ensure this execution is registered when running under an existing workflow
         execution_context = await self._ensure_execution_registered(
@@ -54,13 +52,9 @@ class AgentWorkflow:
         if "execution_context" in signature.parameters:
             call_kwargs.setdefault("execution_context", execution_context)
 
-        input_data = self._build_input_payload(
-            signature, call_args, call_kwargs
-        )
+        input_data = self._build_input_payload(signature, call_args, call_kwargs)
 
-        previous_agent_context = getattr(
-            self.agent, "_current_execution_context", None
-        )
+        previous_agent_context = getattr(self.agent, "_current_execution_context", None)
         client_context = getattr(self.agent, "client", None)
         previous_client_context = None
         if client_context is not None:
@@ -74,9 +68,7 @@ class AgentWorkflow:
             client_context._current_workflow_context = execution_context
 
         start_time = time.time()
-        parent_execution_id = (
-            parent_context.execution_id if parent_context else None
-        )
+        parent_execution_id = parent_context.execution_id if parent_context else None
 
         await self.notify_call_start(
             execution_context.execution_id,
@@ -201,7 +193,10 @@ class AgentWorkflow:
     # --------------------------------------------------------------------- #
 
     def _get_parent_context(self) -> Optional[ExecutionContext]:
-        return getattr(self.agent, "_current_execution_context", None) or get_current_context()
+        return (
+            getattr(self.agent, "_current_execution_context", None)
+            or get_current_context()
+        )
 
     def _build_execution_context(
         self,
