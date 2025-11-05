@@ -1,0 +1,182 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_pypi:
+        description: 'Publish Python SDK to PyPI'
+        type: boolean
+        default: false
+      publish_docker:
+        description: 'Push Docker image'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GO_VERSION: '1.23'
+      PYTHON_VERSION: '3.11'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-release-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-release-go-
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: control-plane/web/client/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Determine publish flags
+        id: flags
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUBLISH_PYPI_INPUT: ${{ github.event.inputs.publish_pypi }}
+          PUBLISH_DOCKER_INPUT: ${{ github.event.inputs.publish_docker }}
+        run: |
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            if [ "${PUBLISH_PYPI_INPUT}" = "true" ]; then
+              echo "publish_pypi=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "publish_pypi=false" >> "$GITHUB_OUTPUT"
+            fi
+            if [ "${PUBLISH_DOCKER_INPUT}" = "true" ]; then
+              echo "publish_docker=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "publish_docker=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "publish_pypi=true" >> "$GITHUB_OUTPUT"
+            echo "publish_docker=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute GoReleaser arguments
+        id: goreleaser
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "args=release --clean --skip-publish --snapshot" >> "$GITHUB_OUTPUT"
+            echo "release_upload=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=release --clean" >> "$GITHUB_OUTPUT"
+            echo "release_upload=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: ${{ steps.goreleaser.outputs.args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload GoReleaser artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: goreleaser-dist
+          path: dist/
+
+      - name: Build Python package
+        working-directory: sdk/python
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Attach Python artifacts to GitHub release
+        if: steps.goreleaser.outputs.release_upload == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sdk/python/dist/*.whl
+            sdk/python/dist/*.tar.gz
+
+      - name: Upload Python package artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-sdk-dist
+          path: sdk/python/dist
+
+      - name: Publish to PyPI
+        if: steps.flags.outputs.publish_pypi == 'true'
+        working-directory: sdk/python
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m pip install --upgrade twine
+          twine upload dist/*
+
+      - name: Compute Docker metadata
+        if: steps.flags.outputs.publish_docker == 'true'
+        id: docker_meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          owner="$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/${owner}/brain-control-plane"
+          if [ "${EVENT_NAME}" = "push" ]; then
+            tag="${REF_NAME}"
+          else
+            tag="${SHA}"
+          fi
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: steps.flags.outputs.publish_docker == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: steps.flags.outputs.publish_docker == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push control plane image
+        if: steps.flags.outputs.publish_docker == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deployments/docker/Dockerfile.control-plane
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.docker_meta.outputs.image }}:${{ steps.docker_meta.outputs.tag }}

@@ -1,0 +1,48 @@
+project_name: brain-control-plane
+
+before:
+  hooks:
+    - npm --prefix control-plane/web/client ci
+    - npm --prefix control-plane/web/client run build
+
+builds:
+  - id: brain-control-plane
+    dir: control-plane
+    main: ./cmd/server
+    binary: brain-server
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: brain-control-plane
+    builds:
+      - brain-control-plane
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+      - control-plane/config/**/*
+
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+
+release:
+  prerelease: auto
+
+changelog:
+  use: git
