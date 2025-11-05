@@ -38,7 +38,7 @@ Agent frameworks (LangChain, CrewAI, etc.) are great for **prototypes**. But whe
 - ❌ **DIY infrastructure** - you're building webhooks, SSE, async execution, health checks from scratch
 - ❌ **No identity or audit** - logs aren't proofs, compliance teams need cryptographic verification
 
-**Frameworks build agents. Haxen runs them at scale, with trust.**
+**Frameworks build agents. Haxen builds and runs them at scale, with trust.**
 
 ### The Solution
 
