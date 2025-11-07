@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/Agent-Field/agentfield/control-plane/internal/application"
 	"github.com/Agent-Field/agentfield/control-plane/internal/cli/commands"
@@ -25,7 +26,7 @@ var (
 )
 
 // NewRootCommand creates and returns the root Cobra command for the AgentField CLI.
-func NewRootCommand(runServerFunc func(cmd *cobra.Command, args []string)) *cobra.Command {
+func NewRootCommand(runServerFunc func(cmd *cobra.Command, args []string), versionInfo VersionInfo) *cobra.Command {
 	RootCmd := &cobra.Command{
 		Use:     "af",
 		Aliases: []string{"agentfield"},
@@ -41,6 +42,25 @@ func NewRootCommand(runServerFunc func(cmd *cobra.Command, args []string)) *cobr
 		},
 		// Default to server mode when no subcommand is provided (backward compatibility)
 		Run: runServerFunc,
+	}
+
+	// Add --version flag
+	var showVersion bool
+	RootCmd.Flags().BoolVar(&showVersion, "version", false, "Print version information")
+
+	// Override Run to check for version flag
+	originalRun := RootCmd.Run
+	RootCmd.Run = func(cmd *cobra.Command, args []string) {
+		if showVersion {
+			fmt.Printf("AgentField Control Plane\n")
+			fmt.Printf("  Version:    %s\n", versionInfo.Version)
+			fmt.Printf("  Commit:     %s\n", versionInfo.Commit)
+			fmt.Printf("  Built:      %s\n", versionInfo.Date)
+			fmt.Printf("  Go version: %s\n", runtime.Version())
+			fmt.Printf("  OS/Arch:    %s/%s\n", runtime.GOOS, runtime.GOARCH)
+			return
+		}
+		originalRun(cmd, args)
 	}
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Path to configuration file (e.g., config/agentfield.yaml)")
 	RootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
@@ -82,6 +102,9 @@ func NewRootCommand(runServerFunc func(cmd *cobra.Command, args []string)) *cobr
 	RootCmd.AddCommand(NewAddCommand())
 	RootCmd.AddCommand(NewMCPCommand())
 	RootCmd.AddCommand(NewVCCommand())
+
+	// Add version command
+	RootCmd.AddCommand(NewVersionCommand(versionInfo))
 
 	// Add the server command
 	serverCmd := &cobra.Command{

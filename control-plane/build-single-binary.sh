@@ -26,7 +26,7 @@ OUTPUT_DIR="$SCRIPT_DIR/dist/releases"
 VERSION="${VERSION:-$(date +%Y%m%d-%H%M%S)}"
 BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 GIT_COMMIT="${GIT_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')}"
-LDFLAGS="-s -w -X main.version=$VERSION -X main.buildTime=$BUILD_TIME -X main.gitCommit=$GIT_COMMIT"
+LDFLAGS="-s -w -X main.version=$VERSION -X main.commit=$GIT_COMMIT -X main.date=$BUILD_TIME"
 
 # Function to print colored output
 print_header() {

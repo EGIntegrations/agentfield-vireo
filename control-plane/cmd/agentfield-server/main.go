@@ -20,6 +20,14 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Build-time version information (set via ldflags during build)
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+// Test injection points
 var (
 	loadConfigFunc            = loadConfig
 	newAgentFieldServerFunc   = server.NewAgentFieldServer
@@ -34,7 +42,14 @@ var (
 
 // main function now acts as the entry point for the Cobra CLI.
 func main() {
-	rootCmd := cli.NewRootCommand(runServer) // Initialize RootCmd and add subcommands
+	// Create version info to pass to CLI
+	versionInfo := cli.VersionInfo{
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+	}
+
+	rootCmd := cli.NewRootCommand(runServer, versionInfo) // Initialize RootCmd and add subcommands
 
 	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {

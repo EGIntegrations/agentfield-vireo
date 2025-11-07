@@ -21,9 +21,23 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Build-time version information (set via ldflags during build)
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
+	// Create version info to pass to CLI
+	versionInfo := cli.VersionInfo{
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+	}
+
 	// Create and execute the root command with actual server functionality
-	rootCmd := cli.NewRootCommand(runServer)
+	rootCmd := cli.NewRootCommand(runServer, versionInfo)
 	if err := rootCmd.Execute(); err != nil {
 		logger.Logger.Error().Err(err).Msg("Error executing root command")
 		os.Exit(1)

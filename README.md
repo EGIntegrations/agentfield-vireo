@@ -83,17 +83,21 @@ Write your first agent—automatically get a REST API:
 from agentfield import Agent
 
 # Create an agent
-app = Agent("greeting-agent")
+app = Agent(node_id="greeting-agent",
+            model="openrouter/meta-llama/llama-4-maverick")
 
 # Decorate a function—becomes a REST endpoint automatically
 @app.reasoner()
 async def say_hello(name: str) -> dict:
+  
     message = await app.ai(f"Generate a personalized greeting for {name}")
+
     return {"greeting": message}
 ```
 
 **Deploy:**
 ```bash
+export OPENROUTER_API_KEY="sk-..."
 af run
 ```
 
