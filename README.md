@@ -89,7 +89,7 @@ app = Agent(node_id="greeting-agent",
 # Decorate a function—becomes a REST endpoint automatically
 @app.reasoner()
 async def say_hello(name: str) -> dict:
-  
+
     message = await app.ai(f"Generate a personalized greeting for {name}")
 
     return {"greeting": message}
@@ -178,7 +178,7 @@ async def handle_ticket(ticket: dict) -> dict:
 
 **Deploy:**
 ```bash
-af dev           # Start control plane
+af server           # Start control plane
 af run           # Deploy your agent
 ```
 

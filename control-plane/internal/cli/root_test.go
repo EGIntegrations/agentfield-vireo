@@ -24,7 +24,11 @@ func TestRootCommandDisplaysHelp(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	resetCLIStateForTest()
 
-	cmd := NewRootCommand(func(cmd *cobra.Command, args []string) {})
+	cmd := NewRootCommand(func(cmd *cobra.Command, args []string) {}, VersionInfo{
+		Version: "test",
+		Commit:  "test",
+		Date:    "test",
+	})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	cmd.SetArgs([]string{"--help"})
@@ -44,6 +48,10 @@ func TestRootCommandServerFlags(t *testing.T) {
 		require.True(t, GetUIDevFlag())
 		require.Equal(t, 9090, GetPortFlag())
 		require.True(t, noVCExecution)
+	}, VersionInfo{
+		Version: "test",
+		Commit:  "test",
+		Date:    "test",
 	})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
@@ -71,6 +79,10 @@ func TestRootCommandHonorsConfigFlag(t *testing.T) {
 	var received string
 	cmd := NewRootCommand(func(cmd *cobra.Command, args []string) {
 		received = GetConfigFilePath()
+	}, VersionInfo{
+		Version: "test",
+		Commit:  "test",
+		Date:    "test",
 	})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
