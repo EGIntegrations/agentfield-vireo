@@ -295,6 +295,20 @@ func (h *WorkflowRunHandler) GetWorkflowRunDetailHandler(c *gin.Context) {
 		if agg.RootExecutionID != nil && detail.Run.RootExecutionID == "" {
 			detail.Run.RootExecutionID = *agg.RootExecutionID
 		}
+	} else {
+		fallbackSummary := summarizeRun(runID, executions)
+		detail.Run.TotalSteps = fallbackSummary.TotalExecutions
+		detail.Run.CompletedSteps = fallbackSummary.StatusCounts[string(types.ExecutionStatusSucceeded)]
+		detail.Run.FailedSteps =
+			fallbackSummary.StatusCounts[string(types.ExecutionStatusFailed)] +
+				fallbackSummary.StatusCounts[string(types.ExecutionStatusCancelled)] +
+				fallbackSummary.StatusCounts[string(types.ExecutionStatusTimeout)]
+		detail.Run.Status = fallbackSummary.Status
+		detail.Run.StatusCounts = cloneStatusCounts(fallbackSummary.StatusCounts)
+
+		if detail.Run.RootExecutionID == "" {
+			detail.Run.RootExecutionID = fallbackSummary.RootExecutionID
+		}
 	}
 
 	detail.Executions = apiExecutions
@@ -313,11 +327,13 @@ func summarizeRun(runID string, executions []*types.Execution) WorkflowRunSummar
 		return summary
 	}
 
-	sort.Slice(executions, func(i, j int) bool {
-		return executions[i].StartedAt.Before(executions[j].StartedAt)
+	sortedExecutions := make([]*types.Execution, len(executions))
+	copy(sortedExecutions, executions)
+	sort.Slice(sortedExecutions, func(i, j int) bool {
+		return sortedExecutions[i].StartedAt.Before(sortedExecutions[j].StartedAt)
 	})
 
-	dag, _, status, name, sessionID, actorID, maxDepth := handlers.BuildWorkflowDAG(executions)
+	dag, _, status, name, sessionID, actorID, maxDepth := handlers.BuildWorkflowDAG(sortedExecutions)
 
 	summary.RootExecutionID = dag.ExecutionID
 	if name != "" {
@@ -333,12 +349,12 @@ func summarizeRun(runID string, executions []*types.Execution) WorkflowRunSummar
 	}
 	summary.SessionID = sessionID
 	summary.ActorID = actorID
-	summary.StartedAt = executions[0].StartedAt
-	summary.UpdatedAt = executions[len(executions)-1].StartedAt
+	summary.StartedAt = sortedExecutions[0].StartedAt
+	summary.UpdatedAt = sortedExecutions[len(sortedExecutions)-1].StartedAt
 	summary.Status = status
 	summary.MaxDepth = maxDepth
-	if len(executions) > 0 {
-		lastExec := executions[len(executions)-1]
+	if len(sortedExecutions) > 0 {
+		lastExec := sortedExecutions[len(sortedExecutions)-1]
 		if lastExec != nil && lastExec.ReasonerID != "" {
 			summary.CurrentTask = lastExec.ReasonerID
 		}
@@ -351,7 +367,7 @@ func summarizeRun(runID string, executions []*types.Execution) WorkflowRunSummar
 	}
 
 	active := 0
-	for _, exec := range executions {
+	for _, exec := range sortedExecutions {
 		normalized := types.NormalizeExecutionStatus(exec.Status)
 		summary.StatusCounts[normalized]++
 		if normalized == string(types.ExecutionStatusRunning) ||

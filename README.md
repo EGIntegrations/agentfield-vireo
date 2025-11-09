@@ -10,9 +10,8 @@ Write agents. AgentField deploys, scales, observes, and proves what happened.
 [![Go](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://go.dev/)
 [![Python](https://img.shields.io/badge/python-3.9+-3776AB.svg)](https://www.python.org/)
 [![Deploy with Docker](https://img.shields.io/badge/deploy-docker-2496ED.svg)](https://docs.docker.com/)
-[![Discord](https://img.shields.io/badge/discord-join-5865F2.svg)](https://discord.gg/your-discord)
 
-**[📚 Docs](https://agentfield.ai/docs)** • **[⚡ Quickstart](#-try-agentfield-in-2-minutes)** • **[💬 Discord](https://discord.gg/your-discord)**
+**[📚 Docs](https://agentfield.ai/docs)** • **[⚡ Quickstart](#-try-agentfield-in-2-minutes)**
 
 </div>
 
@@ -45,7 +44,7 @@ agentfield --version
 
 The installer automatically detects your platform and sets everything up. No sudo required.
 
-**Need help?** [📚 Installation docs](https://agentfield.ai/docs/installation) • [💬 Discord](https://discord.gg/your-discord)
+**Need help?** [📚 Installation docs](https://agentfield.ai/docs/installation)
 
 ---
 
@@ -71,7 +70,7 @@ cd agentfield && docker compose up
 
 Your control plane is running at `http://localhost:8080`
 
-**[📚 Full quickstart guide →](https://agentfield.ai/docs/quick-start)** • **[💬 Need help? Discord](https://discord.gg/your-discord)**
+**[📚 Full quickstart guide →](https://agentfield.ai/docs/quick-start)**
 
 ---
 
@@ -117,7 +116,7 @@ curl -X POST http://localhost:8080/api/v1/execute/greeting-agent.say_hello \
 
 **That's it.** One function = production-ready service.
 
-**[📚 Docs](https://agentfield.ai/docs)** • **[⚡ More examples](https://github.com/agentfield/agentfield-examples)** • **[💬 Discord](https://discord.gg/your-discord)**
+**[📚 Docs](https://agentfield.ai/docs)** • **[⚡ More examples](https://github.com/agentfield/agentfield-examples)**
 
 ---
 
@@ -295,7 +294,7 @@ async def approve_loan(application: dict) -> Decision:
 curl http://agentfield:8080/api/v1/did/workflow/wf_abc123/vc-chain > audit.json
 
 # Verify offline (no access to your systems needed)
-af verify audit.json
+af vc verify audit.json
 # ✓ All signatures valid (W3C VC spec)
 # ✓ No tampering detected
 # ✓ Complete provenance chain
@@ -416,7 +415,6 @@ Each agent deploys independently. Control plane coordinates automatically.
 
 We're building AgentField in the open. Join us:
 
-- **[💬 Discord](https://discord.gg/your-discord)** — Get help, share projects, discuss architecture
 - **[📚 Documentation](https://agentfield.ai/docs)** — Guides, API reference, examples
 - **[💡 GitHub Discussions](https://github.com/agentfield/agentfield/discussions)** — Feature requests, Q&A
 - **[🐦 Twitter/X](https://x.com/agentfield_dev)** — Updates and announcements
@@ -498,7 +496,7 @@ AgentField handles deployment, orchestration, and observability. You control the
 
 **Join the future of autonomous software**
 
-**[🌐 Website](https://agentfield.ai) • [📚 Docs](https://agentfield.ai/docs) • [💬 Discord](https://discord.gg/your-discord) • [🐦 Twitter](https://x.com/agentfield_dev)**
+**[🌐 Website](https://agentfield.ai) • [📚 Docs](https://agentfield.ai/docs) • [🐦 Twitter](https://x.com/agentfield_dev)**
 
 **License:** [Apache 2.0](LICENSE)
 
