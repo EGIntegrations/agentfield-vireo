@@ -141,10 +141,10 @@ func applyEventToExecution(current *types.Execution, req *WorkflowExecutionEvent
 		current.RunID = firstNonEmpty(req.RunID, req.WorkflowID, current.RunID)
 	}
 
-	if payload := marshalJSON(req.InputData); payload != nil && len(payload) > 0 {
+	if payload := marshalJSON(req.InputData); len(payload) > 0 {
 		current.InputPayload = payload
 	}
-	if result := marshalJSON(req.Result); result != nil && len(result) > 0 {
+	if result := marshalJSON(req.Result); len(result) > 0 {
 		current.ResultPayload = result
 	}
 
