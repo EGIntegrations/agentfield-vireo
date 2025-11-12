@@ -394,7 +394,28 @@ func RegisterNodeHandler(storageProvider storage.StorageProvider, uiService *ser
 		var normalizedCandidates []string
 		var probeResults []types.CallbackTestResult
 
-		if len(candidateList) > 0 {
+		// Determine if auto-discovery should be skipped
+		// Skip auto-discovery if:
+		// 1. An explicit BaseURL was provided by the agent AND
+		// 2. Either no discovery mode is set OR mode is explicitly "manual"/"explicit"
+		skipAutoDiscovery := false
+		if newNode.BaseURL != "" {
+			// If callback discovery mode is explicitly set to manual/explicit, respect it
+			if newNode.CallbackDiscovery != nil &&
+				(newNode.CallbackDiscovery.Mode == "manual" || newNode.CallbackDiscovery.Mode == "explicit") {
+				skipAutoDiscovery = true
+				logger.Logger.Info().Msgf("✅ Using explicit callback URL for %s (mode=%s): %s",
+					newNode.ID, newNode.CallbackDiscovery.Mode, newNode.BaseURL)
+			} else if newNode.CallbackDiscovery == nil || newNode.CallbackDiscovery.Mode == "" {
+				// No discovery info provided - treat BaseURL as explicit
+				skipAutoDiscovery = true
+				logger.Logger.Info().Msgf("✅ Using explicit callback URL for %s (no discovery mode): %s",
+					newNode.ID, newNode.BaseURL)
+			}
+		}
+
+		if len(candidateList) > 0 && !skipAutoDiscovery {
+			logger.Logger.Debug().Msgf("🔍 Auto-discovering callback URL for %s from %d candidates", newNode.ID, len(candidateList))
 			probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			resolvedBaseURL, normalizedCandidates, probeResults = resolveCallbackCandidates(probeCtx, candidateList, defaultPort)
 			cancel()
@@ -1165,6 +1186,7 @@ func RegisterServerlessAgentHandler(storageProvider storage.StorageProvider, uiS
 				Description  string                 `json:"description"`
 				InputSchema  map[string]interface{} `json:"input_schema"`
 				OutputSchema map[string]interface{} `json:"output_schema"`
+				Tags         []string               `json:"tags"`
 			} `json:"reasoners"`
 			Skills []struct {
 				ID           string                 `json:"id"`
@@ -1204,6 +1226,7 @@ func RegisterServerlessAgentHandler(storageProvider storage.StorageProvider, uiS
 				ID:           r.ID,
 				InputSchema:  json.RawMessage(inputSchemaBytes),
 				OutputSchema: json.RawMessage(outputSchemaBytes),
+				Tags:         r.Tags,
 			}
 		}
 

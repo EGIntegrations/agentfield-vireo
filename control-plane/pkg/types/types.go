@@ -183,6 +183,7 @@ type ReasonerDefinition struct {
 	InputSchema  json.RawMessage `json:"input_schema"`
 	OutputSchema json.RawMessage `json:"output_schema"`
 	MemoryConfig MemoryConfig    `json:"memory_config"`
+	Tags         []string        `json:"tags,omitempty"`
 }
 
 // SkillDefinition defines a skill provided by an agent node.

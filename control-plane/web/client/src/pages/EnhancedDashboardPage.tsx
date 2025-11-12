@@ -533,8 +533,8 @@ function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
           <Zap className="h-4 w-4" /> Workflow intelligence
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <ResponsiveGrid variant="detail" gap="lg" align="start">
+      <CardContent className="flex flex-1 flex-col min-h-0">
+        <ResponsiveGrid variant="detail" gap="lg" align="start" className="flex-1 min-h-0">
           <InsightsGroup
             title="Top workflows"
             empty="No executions recorded in the last 7 days."
@@ -543,12 +543,12 @@ function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
               <Link
                 to={`/workflows/${workflow.workflow_id}/enhanced`}
                 className={cn(
-                  "block transition-colors hover:border-border hover:bg-muted/30",
+                  "block transition-colors hover:border-border hover:bg-muted/30 min-w-0",
                   cardVariants({ variant: "muted", interactive: false }),
                   "px-3 py-3"
                 )}
               >
-                <div className="space-y-1 text-sm text-foreground">
+                <div className="space-y-1 text-sm text-foreground min-w-0">
                   <p className="font-medium text-foreground truncate">
                     {workflow.name || workflow.workflow_id}
                   </p>
@@ -557,12 +557,14 @@ function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
                     {formatPercentage(workflow.success_rate)} success
                   </p>
                 </div>
-                <div className="mt-2">
+                <div className="mt-2 min-w-0">
                   <Badge
                     variant="outline"
-                    className="inline-flex justify-start rounded-full text-[10px] leading-4 text-left whitespace-nowrap overflow-hidden text-ellipsis"
+                    className="inline-flex justify-start rounded-full text-[10px] leading-4 text-left max-w-full"
                   >
-                    Last run {formatTimestamp(workflow.last_activity)}
+                    <span className="truncate">
+                      Last run {formatTimestamp(workflow.last_activity)}
+                    </span>
                   </Badge>
                 </div>
               </Link>
@@ -578,20 +580,20 @@ function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
                 <Link
                   to={`/executions/${run.execution_id}`}
                   className={cn(
-                    "block transition-colors hover:border-border hover:bg-muted/20",
+                    "block transition-colors hover:border-border hover:bg-muted/20 min-w-0",
                     cardVariants({ variant: "muted", interactive: false }),
                     "px-3 py-2 text-xs"
                   )}
                 >
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium text-foreground">
+                  <div className="flex items-center justify-between min-w-0 gap-2">
+                    <p className="font-medium text-foreground truncate">
                       {run.name || run.workflow_id}
                     </p>
-                    <span className="text-text-tertiary">
+                    <span className="text-text-tertiary flex-shrink-0">
                       {formatDuration(run.elapsed_ms)}
                     </span>
                   </div>
-                  <p className="mt-1 text-text-secondary">
+                  <p className="mt-1 text-text-secondary truncate">
                     {run.execution_id} · {run.reasoner_id}
                   </p>
                 </Link>
@@ -606,13 +608,13 @@ function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
                 <div
                   className={cn(
                     cardVariants({ variant: "muted", interactive: false }),
-                    "px-3 py-2 text-xs"
+                    "px-3 py-2 text-xs min-w-0"
                   )}
                 >
-                  <p className="font-medium text-foreground">
+                  <p className="font-medium text-foreground truncate">
                     {execution.name || execution.workflow_id}
                   </p>
-                  <p className="mt-1 text-text-secondary">
+                  <p className="mt-1 text-text-secondary truncate">
                     {formatDuration(execution.duration_ms)} · Completed{" "}
                     {formatTimestamp(execution.completed_at)}
                   </p>
@@ -765,7 +767,7 @@ function ReasonerActivityPanel({
   agentSummary,
 }: ReasonerActivityPanelProps) {
   return (
-    <Card variant="surface" interactive={false} className="h-full">
+    <Card variant="surface" interactive={false} className="flex h-full flex-col">
       <CardHeader className="space-y-4">
         <CardTitle className="flex items-center gap-2">
           <Cpu className="h-4 w-4" /> Reasoner activity
@@ -788,14 +790,14 @@ function ReasonerActivityPanel({
           />
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-1 flex-col gap-4 min-h-0">
         {reasoners.length === 0 ? (
           <p className="text-body-small">
             No recent reasoner activity. Trigger a workflow or execution to
             populate this view.
           </p>
         ) : (
-          <div className="max-h-[360px] space-y-4 overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4">
             {reasoners.map((reasoner) => (
               <ReasonerRow key={reasoner.reasonerId} reasoner={reasoner} />
             ))}

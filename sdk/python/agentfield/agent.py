@@ -23,6 +23,7 @@ from typing import (
     Literal,
 )
 from agentfield.agent_ai import AgentAI
+from agentfield.agent_cli import AgentCLI
 from agentfield.agent_field_handler import AgentFieldHandler
 from agentfield.agent_mcp import AgentMCP
 from agentfield.agent_registry import clear_current_agent, set_current_agent
@@ -30,7 +31,12 @@ from agentfield.agent_server import AgentServer
 from agentfield.agent_workflow import AgentWorkflow
 from agentfield.client import AgentFieldClient
 from agentfield.dynamic_skills import DynamicMCPSkillManager
-from agentfield.execution_context import ExecutionContext, get_current_context
+from agentfield.execution_context import (
+    ExecutionContext,
+    get_current_context,
+    reset_execution_context,
+    set_execution_context,
+)
 from agentfield.did_manager import DIDManager
 from agentfield.vc_generator import VCGenerator
 from agentfield.mcp_client import MCPClientRegistry
@@ -499,6 +505,7 @@ class Agent(FastAPI):
 
         # Initialize handlers
         self.ai_handler = AgentAI(self)
+        self.cli_handler = AgentCLI(self)
         self.mcp_handler = AgentMCP(self)
         self.agentfield_handler = AgentFieldHandler(self)
         self.workflow_handler = AgentWorkflow(self)
@@ -689,6 +696,7 @@ class Agent(FastAPI):
                     "input_schema": r.get("input_schema", {}),
                     "output_schema": r.get("output_schema", {}),
                     "memory_config": r.get("memory_config", {}),
+                    "tags": r.get("tags", []),
                 }
                 for r in self.reasoners
             ],
@@ -1043,6 +1051,7 @@ class Agent(FastAPI):
                         "id": reasoner["id"],
                         "input_schema": reasoner["input_schema"],
                         "output_schema": reasoner["output_schema"],
+                        "tags": reasoner.get("tags", []),
                     }
                 )
 
@@ -1099,6 +1108,7 @@ class Agent(FastAPI):
         self,
         path: Optional[str] = None,
         name: Optional[str] = None,
+        tags: Optional[List[str]] = None,
         *,
         vc_enabled: Optional[bool] = None,
     ):
@@ -1111,15 +1121,27 @@ class Agent(FastAPI):
         Args:
             path (str, optional): The API endpoint path for this reasoner. Defaults to /reasoners/{function_name}.
             name (str, optional): Explicit AgentField registration ID. Defaults to the function name.
+            tags (List[str] | None, optional): Organizational tags that travel with the reasoner metadata.
             vc_enabled (bool | None, optional): Override VC generation for this reasoner. True forces VC creation,
                 False disables it, and None inherits the agent-level policy.
         """
 
+        direct_registration: Optional[Callable] = None
+        decorator_path = path
+        decorator_name = name
+        decorator_tags = tags
+
+        if decorator_path and (
+            inspect.isfunction(decorator_path) or inspect.ismethod(decorator_path)
+        ):
+            direct_registration = decorator_path
+            decorator_path = None
+
         def decorator(func: Callable) -> Callable:
             # Extract function metadata
             func_name = func.__name__
-            reasoner_id = name or func_name
-            endpoint_path = path or f"/reasoners/{func_name}"
+            reasoner_id = decorator_name or func_name
+            endpoint_path = decorator_path or f"/reasoners/{func_name}"
 
             # Get type hints for input/output schemas
             type_hints = get_type_hints(func)
@@ -1206,6 +1228,18 @@ class Agent(FastAPI):
             setattr(tracked_func, "_original_func", original_func)
             setattr(tracked_func, "_is_tracked_replacement", True)
 
+            resolved_tags: List[str] = []
+            if decorator_tags:
+                resolved_tags = list(decorator_tags)
+            else:
+                decorator_tag_attr = getattr(original_func, "_reasoner_tags", None)
+                if decorator_tag_attr:
+                    if isinstance(decorator_tag_attr, (list, tuple, set)):
+                        resolved_tags = [str(tag) for tag in decorator_tag_attr]
+                    else:
+                        resolved_tags = [str(decorator_tag_attr)]
+            setattr(tracked_func, "_reasoner_tags", resolved_tags)
+
             # Register reasoner metadata
             output_schema = {}
             if hasattr(return_type, "model_json_schema"):
@@ -1226,6 +1260,7 @@ class Agent(FastAPI):
                 "memory_config": self.memory_config.to_dict(),
                 "return_type_hint": getattr(return_type, "__name__", str(return_type)),
             }
+            reasoner_metadata["tags"] = resolved_tags
             reasoner_metadata["vc_enabled"] = self._effective_component_vc_setting(
                 reasoner_id, self._reasoner_vc_overrides
             )
@@ -1247,6 +1282,11 @@ class Agent(FastAPI):
             # consider a different pattern (e.g., a wrapper class or a global registry).
             return tracked_func
 
+        if direct_registration:
+            return decorator(direct_registration)
+        if direct_registration:
+            return decorator(direct_registration)
+
         return decorator
 
     async def _execute_reasoner_endpoint(
@@ -1260,11 +1300,6 @@ class Agent(FastAPI):
     ) -> Any:
         import asyncio
         import time
-        from agentfield.execution_context import (
-            set_execution_context,
-            reset_execution_context,
-        )
-
         execution_context = ExecutionContext.from_request(request, self.node_id)
         payload_dict = input_model.model_dump()
 
@@ -1661,11 +1696,22 @@ class Agent(FastAPI):
             - Use skills for reliable, repeatable operations
         """
 
+        direct_registration: Optional[Callable] = None
+        decorator_tags = tags
+        decorator_path = path
+        decorator_name = name
+
+        if decorator_tags and (
+            inspect.isfunction(decorator_tags) or inspect.ismethod(decorator_tags)
+        ):
+            direct_registration = decorator_tags
+            decorator_tags = None
+
         def decorator(func: Callable) -> Callable:
             # Extract function metadata
             func_name = func.__name__
-            skill_id = name or func_name
-            endpoint_path = path or f"/skills/{func_name}"
+            skill_id = decorator_name or func_name
+            endpoint_path = decorator_path or f"/skills/{func_name}"
             self._set_skill_vc_override(skill_id, vc_enabled)
 
             # Get type hints for input schema
@@ -1692,6 +1738,9 @@ class Agent(FastAPI):
 
                 # Store current context for use in app.call()
                 self._current_execution_context = execution_context
+                context_token = None
+                context_token = set_execution_context(execution_context)
+                self._set_as_current()
 
                 # Create DID execution context if DID system is enabled
                 did_execution_context = None
@@ -1709,7 +1758,8 @@ class Agent(FastAPI):
                     )
 
                 # Convert input to function arguments
-                kwargs = input_data.model_dump()
+                input_payload = input_data.model_dump()
+                kwargs = dict(input_payload)
 
                 # Inject execution context if the function accepts it
                 if "execution_context" in sig.parameters:
@@ -1717,52 +1767,250 @@ class Agent(FastAPI):
 
                 # Record start time for VC generation
                 start_time = time.time()
+                handler = getattr(self, "workflow_handler", None)
+                if handler:
+                    execution_context.reasoner_name = skill_id
+                    await handler.notify_call_start(
+                        execution_context.execution_id,
+                        execution_context,
+                        skill_id,
+                        input_payload,
+                        parent_execution_id=execution_context.parent_execution_id,
+                    )
 
                 # 🔥 FIX: Call the original function directly to prevent double tracking
                 # The FastAPI endpoint already handles tracking, so we don't want the tracked wrapper
                 original_func = getattr(func, "_original_func", func)
-                if asyncio.iscoroutinefunction(original_func):
-                    result = await original_func(**kwargs)
-                else:
-                    result = original_func(**kwargs)
+                try:
+                    if asyncio.iscoroutinefunction(original_func):
+                        result = await original_func(**kwargs)
+                    else:
+                        result = original_func(**kwargs)
 
-                # Generate VC asynchronously if DID is enabled
-                if did_execution_context and self._should_generate_vc(
-                    skill_id, self._skill_vc_overrides
-                ):
-                    end_time = time.time()
-                    duration_ms = int((end_time - start_time) * 1000)
-                    asyncio.create_task(
-                        self._generate_vc_async(
-                            self.vc_generator,
-                            did_execution_context,
-                            skill_id,
-                            input_data.model_dump(),
-                            result,
-                            "success",
-                            None,
-                            duration_ms,
+                    duration_ms = int((time.time() - start_time) * 1000)
+
+                    # Generate VC asynchronously if DID is enabled
+                    if did_execution_context and self._should_generate_vc(
+                        skill_id, self._skill_vc_overrides
+                    ):
+                        asyncio.create_task(
+                            self._generate_vc_async(
+                                self.vc_generator,
+                                did_execution_context,
+                                skill_id,
+                                input_payload,
+                                result,
+                                "success",
+                                None,
+                                duration_ms,
+                            )
                         )
-                    )
 
-                return result
+                    if handler:
+                        await handler.notify_call_complete(
+                            execution_context.execution_id,
+                            execution_context.workflow_id,
+                            result,
+                            duration_ms,
+                            execution_context,
+                            input_data=input_payload,
+                            parent_execution_id=execution_context.parent_execution_id,
+                        )
 
-            # Register skill metadata
+                    return result
+                except asyncio.CancelledError as cancel_err:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    if handler:
+                        await handler.notify_call_error(
+                            execution_context.execution_id,
+                            execution_context.workflow_id,
+                            "Execution cancelled by upstream client",
+                            duration_ms,
+                            execution_context,
+                            input_data=input_payload,
+                            parent_execution_id=execution_context.parent_execution_id,
+                        )
+                    raise cancel_err
+                except HTTPException as http_exc:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    detail = getattr(http_exc, "detail", None) or str(http_exc)
+                    if handler:
+                        await handler.notify_call_error(
+                            execution_context.execution_id,
+                            execution_context.workflow_id,
+                            detail,
+                            duration_ms,
+                            execution_context,
+                            input_data=input_payload,
+                            parent_execution_id=execution_context.parent_execution_id,
+                        )
+                    raise
+                except Exception as exc:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    if handler:
+                        await handler.notify_call_error(
+                            execution_context.execution_id,
+                            execution_context.workflow_id,
+                            str(exc),
+                            duration_ms,
+                            execution_context,
+                            input_data=input_payload,
+                            parent_execution_id=execution_context.parent_execution_id,
+                        )
+                    raise
+                finally:
+                    if context_token is not None:
+                        reset_execution_context(context_token)
+                    self._current_execution_context = None
+                    self._clear_current()
+
+            def _build_invocation_payload(args: tuple, kwargs: dict) -> Dict[str, Any]:
+                try:
+                    bound = sig.bind_partial(*args, **kwargs)
+                    bound.apply_defaults()
+                    payload = {
+                        name: value
+                        for name, value in bound.arguments.items()
+                        if name != "self"
+                    }
+                    return payload
+                except Exception:
+                    payload = {f"arg_{idx}": value for idx, value in enumerate(args)}
+                    payload.update({k: v for k, v in kwargs.items() if k != "self"})
+                    return payload
+
             self.skills.append(
                 {
                     "id": skill_id,
                     "input_schema": InputSchema.model_json_schema(),
-                    "tags": tags or [],
+                    "tags": decorator_tags or [],
                     "vc_enabled": self._effective_component_vc_setting(
                         skill_id, self._skill_vc_overrides
                     ),
                 }
             )
 
-            if skill_id != func_name:
-                setattr(self, skill_id, getattr(self, func_name, func))
+            original_func = func
+            is_async = asyncio.iscoroutinefunction(original_func)
 
-            return func
+            async def _run_async_skill(*args, **kwargs):
+                current_context = get_current_context()
+                if not current_context or not self.workflow_handler:
+                    return await original_func(*args, **kwargs)
+
+                child_context = current_context.create_child_context()
+                child_context.reasoner_name = skill_id
+                token = set_execution_context(child_context)
+                previous_ctx = self._current_execution_context
+                self._current_execution_context = child_context
+                input_payload = _build_invocation_payload(args, kwargs)
+
+                await self.workflow_handler.notify_call_start(
+                    child_context.execution_id,
+                    child_context,
+                    skill_id,
+                    input_payload,
+                    parent_execution_id=current_context.execution_id,
+                )
+
+                start_time = time.time()
+                try:
+                    result = await original_func(*args, **kwargs)
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    await self.workflow_handler.notify_call_complete(
+                        child_context.execution_id,
+                        child_context.workflow_id,
+                        result,
+                        duration_ms,
+                        child_context,
+                        input_data=input_payload,
+                        parent_execution_id=current_context.execution_id,
+                    )
+                    return result
+                except Exception as exc:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    await self.workflow_handler.notify_call_error(
+                        child_context.execution_id,
+                        child_context.workflow_id,
+                        str(exc),
+                        duration_ms,
+                        child_context,
+                        input_data=input_payload,
+                        parent_execution_id=current_context.execution_id,
+                    )
+                    raise
+                finally:
+                    reset_execution_context(token)
+                    self._current_execution_context = previous_ctx
+
+            def _run_sync_skill(*args, **kwargs):
+                current_context = get_current_context()
+                if not current_context or not self.agentfield_server:
+                    return original_func(*args, **kwargs)
+
+                child_context = current_context.create_child_context()
+                child_context.reasoner_name = skill_id
+                token = set_execution_context(child_context)
+                previous_ctx = self._current_execution_context
+                self._current_execution_context = child_context
+
+                input_payload = _build_invocation_payload(args, kwargs)
+                start_time = time.time()
+
+                self._emit_workflow_event_sync(
+                    child_context,
+                    skill_id,
+                    status="running",
+                    input_data=input_payload,
+                    parent_execution_id=current_context.execution_id,
+                )
+
+                try:
+                    result = original_func(*args, **kwargs)
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    self._emit_workflow_event_sync(
+                        child_context,
+                        skill_id,
+                        status="succeeded",
+                        input_data=input_payload,
+                        result=result,
+                        duration_ms=duration_ms,
+                        parent_execution_id=current_context.execution_id,
+                    )
+                    return result
+                except Exception as exc:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    self._emit_workflow_event_sync(
+                        child_context,
+                        skill_id,
+                        status="failed",
+                        input_data=input_payload,
+                        error=str(exc),
+                        duration_ms=duration_ms,
+                        parent_execution_id=current_context.execution_id,
+                    )
+                    raise
+                finally:
+                    reset_execution_context(token)
+                    self._current_execution_context = previous_ctx
+
+            if is_async:
+                tracked_callable = _run_async_skill
+            else:
+                tracked_callable = _run_sync_skill
+
+            setattr(tracked_callable, "_original_func", original_func)
+            setattr(tracked_callable, "_is_tracked_replacement", True)
+
+            if skill_id != func_name:
+                setattr(self, skill_id, getattr(self, func_name, tracked_callable))
+            else:
+                setattr(self, func_name, tracked_callable)
+
+            return tracked_callable
+
+        if direct_registration:
+            return decorator(direct_registration)
 
         return decorator
 
@@ -1828,14 +2076,25 @@ class Agent(FastAPI):
                     override_prefix=normalized_prefix,
                 )
 
-                entry_kwargs = entry.get("kwargs", {})
-                explicit_reasoner_name = entry_kwargs.get("name")
+                merged_tags: List[str] = []
+                if tags:
+                    merged_tags.extend(tags)
+                merged_tags.extend(entry.get("tags", []))
+                tag_arg: Optional[List[str]] = merged_tags if merged_tags else None
+
+                entry_kwargs = dict(entry.get("kwargs", {}))
+                explicit_reasoner_name = entry_kwargs.pop("name", None)
                 reasoner_id = explicit_reasoner_name or _build_prefixed_name(
                     namespace_segments,
                     func.__name__,
                 )
 
-                decorated = self.reasoner(path=resolved_path, name=reasoner_id)(func)
+                decorated = self.reasoner(
+                    path=resolved_path,
+                    name=reasoner_id,
+                    tags=tag_arg,
+                    **entry_kwargs,
+                )(func)
                 _replace_module_reference(func, decorated)
                 entry["func"] = decorated
                 entry["registered"] = True
@@ -2782,6 +3041,63 @@ class Agent(FastAPI):
         # Also clear from thread-local storage
         clear_current_agent()
 
+    def _emit_workflow_event_sync(
+        self,
+        context: ExecutionContext,
+        component_id: str,
+        status: str,
+        *,
+        input_data: Optional[Dict[str, Any]] = None,
+        result: Optional[Any] = None,
+        error: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+        parent_execution_id: Optional[str] = None,
+    ) -> None:
+        """Best-effort synchronous workflow event emitter for local skill calls."""
+
+        if not self.agentfield_server:
+            return
+
+        try:
+            import requests
+        except ImportError:
+            if self.dev_mode:
+                log_warn("requests library unavailable, skipping workflow event emission")
+            return
+
+        payload: Dict[str, Any] = {
+            "execution_id": context.execution_id,
+            "workflow_id": context.workflow_id,
+            "run_id": context.run_id,
+            "reasoner_id": component_id,
+            "type": component_id,
+            "agent_node_id": self.node_id,
+            "status": status,
+            "parent_execution_id": parent_execution_id,
+            "parent_workflow_id": context.parent_workflow_id
+            or context.workflow_id,
+        }
+
+        if input_data is not None:
+            payload["input_data"] = jsonable_encoder(input_data)
+        if result is not None:
+            payload["result"] = jsonable_encoder(result)
+        if error is not None:
+            payload["error"] = error
+        if duration_ms is not None:
+            payload["duration_ms"] = duration_ms
+
+        url = self.agentfield_server.rstrip("/") + "/api/v1/workflow/executions/events"
+        try:
+            response = requests.post(url, json=payload, timeout=5)
+            if response.status_code >= 400 and self.dev_mode:
+                log_warn(
+                    f"Workflow event ({status}) for {component_id} failed: {response.status_code} {response.text}"
+                )
+        except Exception as exc:
+            if self.dev_mode:
+                log_warn(f"Failed to emit workflow event for {component_id}: {exc}")
+
     def _setup_signal_handlers(
         self,
     ) -> None:  # pragma: no cover - requires signal integration
@@ -2823,6 +3139,76 @@ class Agent(FastAPI):
         except Exception:
             # Ignore errors in destructor to prevent warnings during garbage collection
             pass
+
+    def run(self, **serve_kwargs):
+        """
+        Universal entry point - auto-detects CLI vs server mode.
+
+        This method intelligently determines whether to run in CLI mode or server mode
+        based on command-line arguments. It provides a seamless developer experience
+        where the same code can be used for both interactive CLI usage and production
+        server deployment.
+
+        CLI mode is activated when sys.argv contains commands like:
+        - 'call': Execute a specific function
+        - 'list': List all available functions
+        - 'shell': Launch interactive IPython shell
+        - 'help': Show help for a specific function
+
+        Server mode is activated otherwise, starting the FastAPI server.
+
+        Args:
+            **serve_kwargs: Keyword arguments passed to serve() method in server mode.
+                          Common options include:
+                          - port: Server port (default: auto-detected)
+                          - host: Server host (default: "0.0.0.0")
+                          - dev: Enable development mode (default: False)
+                          - auto_port: Auto-find available port (default: False)
+
+        Example:
+            ```python
+            from agentfield import Agent
+
+            app = Agent(node_id="my_agent")
+
+            @app.reasoner()
+            async def analyze(text: str) -> dict:
+                return {"result": text.upper()}
+
+            @app.skill()
+            def get_status() -> dict:
+                return {"status": "active"}
+
+            if __name__ == "__main__":
+                # Single entry point for both CLI and server
+                app.run()
+
+            # CLI usage:
+            # python main.py list
+            # python main.py call analyze --text "hello world"
+            # python main.py shell
+            # python main.py help analyze
+
+            # Server usage:
+            # python main.py
+            # python main.py --port 8080 --dev
+            ```
+
+        Note:
+            - CLI mode runs functions directly without starting a server
+            - Server mode starts the FastAPI server for production use
+            - The mode is automatically detected from command-line arguments
+            - No code changes needed to switch between modes
+        """
+        import sys
+
+        # Check if CLI mode is requested
+        if len(sys.argv) > 1 and sys.argv[1] in ['call', 'list', 'shell', 'help']:
+            # Run in CLI mode
+            self.cli_handler.run_cli()
+        else:
+            # Run in server mode
+            self.serve(**serve_kwargs)
 
     def serve(  # pragma: no cover - requires full server runtime integration
         self,

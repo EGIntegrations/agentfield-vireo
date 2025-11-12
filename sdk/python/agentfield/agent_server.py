@@ -835,6 +835,8 @@ class AgentServer:
         # Smart port resolution with priority order
         if port is None:
             # Check for AgentField CLI integration via environment variable
+            import os
+
             env_port = os.getenv("PORT")
             if env_port and env_port.isdigit():
                 suggested_port = int(env_port)
@@ -896,7 +898,32 @@ class AgentServer:
 
         # Set base_url for registration - preserve explicit callback URL if set
         if not self.agent.base_url:
-            self.agent.base_url = f"http://localhost:{port}"
+            # Check AGENT_CALLBACK_URL environment variable before defaulting to localhost
+            import os
+            import urllib.parse
+
+            env_callback_url = os.getenv("AGENT_CALLBACK_URL")
+            if env_callback_url:
+                # Parse the environment variable URL to extract the hostname
+                try:
+                    parsed = urllib.parse.urlparse(env_callback_url)
+                    if parsed.hostname:
+                        self.agent.base_url = (
+                            f"{parsed.scheme or 'http'}://{parsed.hostname}:{port}"
+                        )
+                        if self.agent.dev_mode:
+                            log_debug(
+                                f"Using AGENT_CALLBACK_URL from environment: {self.agent.base_url}"
+                            )
+                    else:
+                        # Invalid URL in env var, fall back to localhost
+                        self.agent.base_url = f"http://localhost:{port}"
+                except Exception:
+                    # Failed to parse env var, fall back to localhost
+                    self.agent.base_url = f"http://localhost:{port}"
+            else:
+                # No env var set, use localhost
+                self.agent.base_url = f"http://localhost:{port}"
         else:
             # Update port in existing base_url if needed
             import urllib.parse
