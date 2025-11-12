@@ -89,6 +89,7 @@ export function ReasonersSkillsTable({
       exposure_level: reasonerDIDs[reasoner.id]?.exposure_level,
       capabilities: reasonerDIDs[reasoner.id]?.capabilities,
       memory_retention: reasoner.memory_config?.memory_retention,
+      tags: reasoner.tags,
     })),
     ...skills.map((skill): TableItem => ({
       id: skill.id,

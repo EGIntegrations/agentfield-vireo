@@ -17,6 +17,7 @@ export interface ReasonerWithNode {
     memory_retention: string;
     cache_results: boolean;
   };
+  tags?: string[];
   
   // Performance metrics (optional)
   avg_response_time_ms?: number;

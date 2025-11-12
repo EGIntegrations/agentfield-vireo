@@ -28,9 +28,37 @@ const ReasonersList: React.FC<ReasonersListProps> = ({ reasoners }) => {
       </div>
       <div className="flex flex-wrap gap-2">
         {reasoners.map((reasoner) => (
-          <Badge key={reasoner.id} variant="secondary" className="text-xs">
-            {reasoner.id}
-          </Badge>
+          <div
+            key={reasoner.id}
+            className="min-w-[140px] rounded-lg border border-border-secondary bg-card px-3 py-2"
+          >
+            <div className="text-xs font-medium text-text-primary">
+              {reasoner.id}
+            </div>
+            {reasoner.tags && reasoner.tags.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {reasoner.tags.slice(0, 3).map((tag) => (
+                  <Badge
+                    key={`${reasoner.id}-${tag}`}
+                    variant="outline"
+                    className="text-[10px] bg-background text-text-tertiary border-border-secondary"
+                  >
+                    #{tag}
+                  </Badge>
+                ))}
+                {reasoner.tags.length > 3 && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] bg-background text-text-quaternary border-border-secondary"
+                  >
+                    +{reasoner.tags.length - 3}
+                  </Badge>
+                )}
+              </div>
+            ) : (
+              <p className="mt-1 text-[11px] text-text-tertiary">No tags</p>
+            )}
+          </div>
         ))}
       </div>
     </div>

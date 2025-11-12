@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DIDIdentityBadge } from "../components/did/DIDDisplay";
+import { Badge } from "../components/ui/badge";
 import { ExecutionForm } from "../components/reasoners/ExecutionForm";
 import { ExecutionHistoryList } from "../components/reasoners/ExecutionHistoryList";
 import {
@@ -258,6 +259,19 @@ export function ReasonerDetailPage() {
           <span>•</span>
           <DIDIdentityBadge nodeId={reasoner.node_id} showDID={true} />
         </div>
+        {reasoner.tags && reasoner.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {reasoner.tags.map((tag) => (
+              <Badge
+                key={`${reasoner.reasoner_id}-${tag}`}
+                variant="secondary"
+                className="text-xs"
+              >
+                #{tag}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Quick Stats */}

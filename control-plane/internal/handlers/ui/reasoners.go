@@ -41,6 +41,7 @@ type ReasonerWithNode struct {
 	InputSchema  interface{}        `json:"input_schema"`
 	OutputSchema interface{}        `json:"output_schema"`
 	MemoryConfig types.MemoryConfig `json:"memory_config"`
+	Tags         []string           `json:"tags"`
 
 	// Performance metrics (placeholder for future implementation)
 	AvgResponseTime *int       `json:"avg_response_time_ms,omitempty"`
@@ -141,6 +142,7 @@ func (h *ReasonersHandler) GetAllReasonersHandler(c *gin.Context) {
 				InputSchema:  reasoner.InputSchema,
 				OutputSchema: reasoner.OutputSchema,
 				MemoryConfig: reasoner.MemoryConfig,
+				Tags:         reasoner.Tags,
 				LastUpdated:  node.LastHeartbeat,
 			}
 
@@ -262,6 +264,7 @@ func (h *ReasonersHandler) GetReasonerDetailsHandler(c *gin.Context) {
 		InputSchema:  foundReasoner.InputSchema,
 		OutputSchema: foundReasoner.OutputSchema,
 		MemoryConfig: foundReasoner.MemoryConfig,
+		Tags:         foundReasoner.Tags,
 		LastUpdated:  node.LastHeartbeat,
 	}
 

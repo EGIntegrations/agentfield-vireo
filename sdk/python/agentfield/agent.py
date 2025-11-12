@@ -689,6 +689,7 @@ class Agent(FastAPI):
                     "input_schema": r.get("input_schema", {}),
                     "output_schema": r.get("output_schema", {}),
                     "memory_config": r.get("memory_config", {}),
+                    "tags": r.get("tags", []),
                 }
                 for r in self.reasoners
             ],
@@ -1043,6 +1044,7 @@ class Agent(FastAPI):
                         "id": reasoner["id"],
                         "input_schema": reasoner["input_schema"],
                         "output_schema": reasoner["output_schema"],
+                        "tags": reasoner.get("tags", []),
                     }
                 )
 
@@ -1099,6 +1101,7 @@ class Agent(FastAPI):
         self,
         path: Optional[str] = None,
         name: Optional[str] = None,
+        tags: Optional[List[str]] = None,
         *,
         vc_enabled: Optional[bool] = None,
     ):
@@ -1111,15 +1114,27 @@ class Agent(FastAPI):
         Args:
             path (str, optional): The API endpoint path for this reasoner. Defaults to /reasoners/{function_name}.
             name (str, optional): Explicit AgentField registration ID. Defaults to the function name.
+            tags (List[str] | None, optional): Organizational tags that travel with the reasoner metadata.
             vc_enabled (bool | None, optional): Override VC generation for this reasoner. True forces VC creation,
                 False disables it, and None inherits the agent-level policy.
         """
 
+        direct_registration: Optional[Callable] = None
+        decorator_path = path
+        decorator_name = name
+        decorator_tags = tags
+
+        if decorator_path and (
+            inspect.isfunction(decorator_path) or inspect.ismethod(decorator_path)
+        ):
+            direct_registration = decorator_path
+            decorator_path = None
+
         def decorator(func: Callable) -> Callable:
             # Extract function metadata
             func_name = func.__name__
-            reasoner_id = name or func_name
-            endpoint_path = path or f"/reasoners/{func_name}"
+            reasoner_id = decorator_name or func_name
+            endpoint_path = decorator_path or f"/reasoners/{func_name}"
 
             # Get type hints for input/output schemas
             type_hints = get_type_hints(func)
@@ -1206,6 +1221,18 @@ class Agent(FastAPI):
             setattr(tracked_func, "_original_func", original_func)
             setattr(tracked_func, "_is_tracked_replacement", True)
 
+            resolved_tags: List[str] = []
+            if decorator_tags:
+                resolved_tags = list(decorator_tags)
+            else:
+                decorator_tag_attr = getattr(original_func, "_reasoner_tags", None)
+                if decorator_tag_attr:
+                    if isinstance(decorator_tag_attr, (list, tuple, set)):
+                        resolved_tags = [str(tag) for tag in decorator_tag_attr]
+                    else:
+                        resolved_tags = [str(decorator_tag_attr)]
+            setattr(tracked_func, "_reasoner_tags", resolved_tags)
+
             # Register reasoner metadata
             output_schema = {}
             if hasattr(return_type, "model_json_schema"):
@@ -1226,6 +1253,7 @@ class Agent(FastAPI):
                 "memory_config": self.memory_config.to_dict(),
                 "return_type_hint": getattr(return_type, "__name__", str(return_type)),
             }
+            reasoner_metadata["tags"] = resolved_tags
             reasoner_metadata["vc_enabled"] = self._effective_component_vc_setting(
                 reasoner_id, self._reasoner_vc_overrides
             )
@@ -1246,6 +1274,11 @@ class Agent(FastAPI):
             # If you need to expose it directly on the decorated function,
             # consider a different pattern (e.g., a wrapper class or a global registry).
             return tracked_func
+
+        if direct_registration:
+            return decorator(direct_registration)
+        if direct_registration:
+            return decorator(direct_registration)
 
         return decorator
 
@@ -1661,11 +1694,22 @@ class Agent(FastAPI):
             - Use skills for reliable, repeatable operations
         """
 
+        direct_registration: Optional[Callable] = None
+        decorator_tags = tags
+        decorator_path = path
+        decorator_name = name
+
+        if decorator_tags and (
+            inspect.isfunction(decorator_tags) or inspect.ismethod(decorator_tags)
+        ):
+            direct_registration = decorator_tags
+            decorator_tags = None
+
         def decorator(func: Callable) -> Callable:
             # Extract function metadata
             func_name = func.__name__
-            skill_id = name or func_name
-            endpoint_path = path or f"/skills/{func_name}"
+            skill_id = decorator_name or func_name
+            endpoint_path = decorator_path or f"/skills/{func_name}"
             self._set_skill_vc_override(skill_id, vc_enabled)
 
             # Get type hints for input schema
@@ -1752,7 +1796,7 @@ class Agent(FastAPI):
                 {
                     "id": skill_id,
                     "input_schema": InputSchema.model_json_schema(),
-                    "tags": tags or [],
+                    "tags": decorator_tags or [],
                     "vc_enabled": self._effective_component_vc_setting(
                         skill_id, self._skill_vc_overrides
                     ),
@@ -1763,6 +1807,9 @@ class Agent(FastAPI):
                 setattr(self, skill_id, getattr(self, func_name, func))
 
             return func
+
+        if direct_registration:
+            return decorator(direct_registration)
 
         return decorator
 
@@ -1828,14 +1875,25 @@ class Agent(FastAPI):
                     override_prefix=normalized_prefix,
                 )
 
-                entry_kwargs = entry.get("kwargs", {})
-                explicit_reasoner_name = entry_kwargs.get("name")
+                merged_tags: List[str] = []
+                if tags:
+                    merged_tags.extend(tags)
+                merged_tags.extend(entry.get("tags", []))
+                tag_arg: Optional[List[str]] = merged_tags if merged_tags else None
+
+                entry_kwargs = dict(entry.get("kwargs", {}))
+                explicit_reasoner_name = entry_kwargs.pop("name", None)
                 reasoner_id = explicit_reasoner_name or _build_prefixed_name(
                     namespace_segments,
                     func.__name__,
                 )
 
-                decorated = self.reasoner(path=resolved_path, name=reasoner_id)(func)
+                decorated = self.reasoner(
+                    path=resolved_path,
+                    name=reasoner_id,
+                    tags=tag_arg,
+                    **entry_kwargs,
+                )(func)
                 _replace_module_reference(func, decorated)
                 entry["func"] = decorated
                 entry["registered"] = True

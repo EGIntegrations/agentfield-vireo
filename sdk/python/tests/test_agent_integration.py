@@ -5,6 +5,7 @@ import pytest
 from fastapi import APIRouter
 
 from agentfield.router import AgentRouter
+from agentfield.decorators import reasoner as tracked_reasoner
 
 from tests.helpers import create_test_agent
 
@@ -107,6 +108,34 @@ async def test_agent_reasoner_custom_name(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_agent_reasoner_without_parentheses(monkeypatch):
+    agent, _ = create_test_agent(monkeypatch)
+    agent.async_config.enable_async_execution = False
+    agent.agentfield_server = None
+
+    @agent.reasoner
+    async def greet(name: str) -> dict:
+        return {"message": f"hello {name}"}
+
+    assert any(r["id"] == "greet" for r in agent.reasoners)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=agent), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/reasoners/greet",
+            json={"name": "AgentField"},
+            headers={
+                "x-workflow-id": "wf-parentheses",
+                "x-execution-id": "exec-parentheses",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "hello AgentField"}
+
+
+@pytest.mark.asyncio
 async def test_agent_router_prefix_registration(monkeypatch):
     agent, _ = create_test_agent(monkeypatch)
     # Disable async execution for this test to get synchronous 200 responses
@@ -168,6 +197,66 @@ async def test_agent_router_prefix_sanitization(monkeypatch):
 
     assert any(r["id"] == "users_profile_v1_fetch_order" for r in agent.reasoners)
     assert hasattr(agent, "users_profile_v1_fetch_order")
+
+
+@pytest.mark.asyncio
+async def test_agent_skill_without_parentheses(monkeypatch):
+    agent, _ = create_test_agent(monkeypatch)
+    agent.async_config.enable_async_execution = False
+    agent.agentfield_server = None
+
+    @agent.skill
+    def shout(text: str) -> dict:
+        return {"value": text.upper()}
+
+    assert any(s["id"] == "shout" for s in agent.skills)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=agent), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/skills/shout",
+            json={"text": "agentfield"},
+            headers={
+                "x-workflow-id": "wf-skill",
+                "x-execution-id": "exec-skill",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"value": "AGENTFIELD"}
+
+
+@pytest.mark.asyncio
+async def test_reasoner_tags_propagate_to_metadata(monkeypatch):
+    agent, _ = create_test_agent(monkeypatch)
+    agent.async_config.enable_async_execution = False
+    agent.agentfield_server = None
+
+    @agent.reasoner(tags=["ai", "personalization"])
+    async def personalize(name: str) -> dict:
+        return {"greeting": name}
+
+    tagged_reasoner = next(r for r in agent.reasoners if r["id"] == "personalize")
+    assert tagged_reasoner["tags"] == ["ai", "personalization"]
+
+    @agent.reasoner()
+    @tracked_reasoner(tags=["decorated"])
+    async def decorated_reasoner(topic: str) -> dict:
+        return {"topic": topic}
+
+    decorated_meta = next(r for r in agent.reasoners if r["id"] == "decorated_reasoner")
+    assert decorated_meta["tags"] == ["decorated"]
+
+    router = AgentRouter(prefix="suite", tags=["router"])
+
+    @router.reasoner(tags=["local"])
+    async def hello(name: str) -> dict:
+        return {"message": name}
+
+    agent.include_router(router, tags=["include"])
+    router_meta = next(r for r in agent.reasoners if r["id"] == "suite_hello")
+    assert router_meta["tags"] == ["include", "router", "local"]
 
 
 @pytest.mark.asyncio

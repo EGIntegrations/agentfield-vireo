@@ -53,11 +53,29 @@ def test_reasoner_and_skill_registration():
 
     assert router.reasoners[0]["func"] is sample_reasoner
     assert router.reasoners[0]["path"] == "/foo"
+    assert router.reasoners[0]["tags"] == ["base"]
 
     skill_entry = router.skills[0]
     assert skill_entry["func"] is sample_skill
     assert skill_entry["tags"] == ["base", "extra"]
     assert skill_entry["path"] == "tool"
+
+
+def test_router_supports_parentheses_free_decorators():
+    router = AgentRouter()
+
+    @router.reasoner
+    def inline_reasoner():
+        return "ok"
+
+    @router.skill
+    def inline_skill():
+        return "ok"
+
+    assert router.reasoners[0]["func"] is inline_reasoner
+    assert router.reasoners[0]["path"] is None
+    assert router.skills[0]["func"] is inline_skill
+    assert router.skills[0]["path"] is None
 
 
 @pytest.mark.parametrize(

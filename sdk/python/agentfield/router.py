@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import inspect
+
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -21,20 +23,40 @@ class AgentRouter:
     # ------------------------------------------------------------------
     # Registration helpers
     def reasoner(
-        self, path: Optional[str] = None, **kwargs: Any
+        self,
+        path: Optional[str] = None,
+        *,
+        tags: Optional[List[str]] = None,
+        **kwargs: Any,
     ) -> Callable[[Callable], Callable]:
         """Store a reasoner definition for later registration on an Agent."""
 
+        direct_registration: Optional[Callable] = None
+        decorator_path = path
+        decorator_tags = tags
+        decorator_kwargs = dict(kwargs)
+
+        if decorator_path and (
+            inspect.isfunction(decorator_path) or inspect.ismethod(decorator_path)
+        ):
+            direct_registration = decorator_path
+            decorator_path = None
+
         def decorator(func: Callable) -> Callable:
+            merged_tags = self.tags + (decorator_tags or [])
             self.reasoners.append(
                 {
                     "func": func,
-                    "path": path,
-                    "kwargs": kwargs,
+                    "path": decorator_path,
+                    "tags": merged_tags,
+                    "kwargs": dict(decorator_kwargs),
                     "registered": False,
                 }
             )
             return func
+
+        if direct_registration:
+            return decorator(direct_registration)
 
         return decorator
 
@@ -46,18 +68,32 @@ class AgentRouter:
     ) -> Callable[[Callable], Callable]:
         """Store a skill definition, merging router and local tags."""
 
+        direct_registration: Optional[Callable] = None
+        decorator_tags = tags
+        decorator_path = path
+        decorator_kwargs = dict(kwargs)
+
+        if decorator_tags and (
+            inspect.isfunction(decorator_tags) or inspect.ismethod(decorator_tags)
+        ):
+            direct_registration = decorator_tags
+            decorator_tags = None
+
         def decorator(func: Callable) -> Callable:
-            merged_tags = self.tags + (tags or [])
+            merged_tags = self.tags + (decorator_tags or [])
             self.skills.append(
                 {
                     "func": func,
-                    "path": path,
+                    "path": decorator_path,
                     "tags": merged_tags,
-                    "kwargs": kwargs,
+                    "kwargs": decorator_kwargs,
                     "registered": False,
                 }
             )
             return func
+
+        if direct_registration:
+            return decorator(direct_registration)
 
         return decorator
 
