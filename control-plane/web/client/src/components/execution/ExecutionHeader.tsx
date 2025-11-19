@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom";
 import type { WorkflowExecution } from "../../types/executions";
 import type { CanonicalStatus } from "../../utils/status";
 import { DIDDisplay } from "../did/DIDDisplay";
-import { Button } from "../ui/button";
 import StatusIndicator from "../ui/status-indicator";
 import { VerifiableCredentialBadge } from "../vc";
 import { cn } from "../../lib/utils";
@@ -54,10 +53,10 @@ function WebhookStat({
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">
+      <span className="text-label text-muted-foreground/80">
         {label}
       </span>
-      <span className={cn("text-sm font-medium", toneClasses[tone] ?? toneClasses.muted)}>
+      <span className={cn("text-sm font-medium font-mono", toneClasses[tone] ?? toneClasses.muted)}>
         {value}
       </span>
     </div>
@@ -102,8 +101,6 @@ export function ExecutionHeader({
 }: ExecutionHeaderProps) {
   const navigate = useNavigate();
   const normalizedStatus = normalizeStatus(execution.status);
-  const statusLabel =
-    normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
   const workflowTags = execution.workflow_tags ?? [];
   const webhookEvents = Array.isArray(execution.webhook_events)
     ? [...execution.webhook_events].sort(
@@ -134,7 +131,7 @@ export function ExecutionHeader({
     : webhookSuccessCount > 0
       ? `${webhookSuccessCount} delivered`
       : webhookPending
-        ? "Pending webhook"
+        ? "Pending"
         : "Registered";
 
   const handleNavigateBack = () => {
@@ -152,266 +149,269 @@ export function ExecutionHeader({
     navigate(`/executions?session_id=${execution.session_id}`);
 
   return (
-    <div className="space-y-4">
-      {/* Back Navigation */}
-      <div className="flex items-center">
-        <Button
-          variant="ghost"
-          size="sm"
+    <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <div className="flex items-center text-sm text-muted-foreground">
+        <button
           onClick={handleNavigateBack}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground -ml-2"
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Executions
-        </Button>
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Executions
+        </button>
+        <span className="mx-2 text-border">/</span>
+        <span className="font-mono text-foreground">{truncateId(execution.execution_id)}</span>
       </div>
 
-      {/* Main Header - Clean Linear Style */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3 text-body">
-          <h1 className="text-heading-1">
-            {execution.reasoner_id}
-          </h1>
-          <StatusIndicator
-            status={normalizedStatus}
-            animated={normalizedStatus === "running"}
-            className="text-base"
-          />
-          <span className="text-body">{statusLabel}</span>
-          {webhookRegistered && (
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-xs flex items-center gap-1 cursor-pointer",
-                    webhookFailureCount > 0
-                      ? "border-destructive/40 text-destructive"
-                      : webhookSuccessCount > 0
-                        ? "border-emerald-500/40 text-emerald-500"
-                        : "border-border text-muted-foreground",
-                  )}
-                >
-                  <RadioTower className="h-3 w-3" />
-                  {webhookBadgeLabel}
-                </Badge>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-80 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-body font-medium text-text-primary">
-                      {webhookPending
-                        ? "Awaiting first delivery"
-                        : latestWebhookEvent
-                          ? `Last webhook ${formatWebhookStatusLabel(latestWebhookEvent.status)}`
-                          : "Webhook registered"}
-                    </p>
-                    <p className="text-body-small">
-                      {webhookPending &&
-                        "We will display the latest delivery details as soon as the callback is reported."}
-                      {!webhookPending && latestWebhookEvent && (
-                        <>
-                          {formatWebhookStatusLabel(latestWebhookEvent.status)}
-                          {latestWebhookEvent.http_status ? ` • HTTP ${latestWebhookEvent.http_status}` : ""}
-                        </>
+      {/* Main Header */}
+      <div className="space-y-6">
+        {/* Top Row: Title & Status */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-heading-2 font-semibold tracking-tight">
+                {execution.reasoner_id}
+              </h1>
+              <StatusIndicator
+                status={normalizedStatus}
+                animated={normalizedStatus === "running"}
+                className="text-sm"
+              />
+              {webhookRegistered && (
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "cursor-pointer gap-1.5 font-mono",
+                        webhookFailureCount > 0
+                          ? "border-destructive/40 text-destructive"
+                          : webhookSuccessCount > 0
+                            ? "border-emerald-500/40 text-emerald-500"
+                            : "border-border text-muted-foreground",
                       )}
-                      {!webhookPending && !latestWebhookEvent && "No deliveries recorded yet."}
-                    </p>
-                  </div>
-                  {latestWebhookTimestamp && (
-                    <span className="text-body-small text-muted-foreground whitespace-nowrap">
-                      {latestWebhookTimestamp}
-                    </span>
-                  )}
-                </div>
+                    >
+                      <RadioTower className="h-3 w-3" />
+                      {webhookBadgeLabel}
+                    </Badge>
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {webhookPending
+                            ? "Awaiting first delivery"
+                            : latestWebhookEvent
+                              ? `Last webhook ${formatWebhookStatusLabel(latestWebhookEvent.status)}`
+                              : "Webhook registered"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {webhookPending &&
+                            "We will display the latest delivery details as soon as the callback is reported."}
+                          {!webhookPending && latestWebhookEvent && (
+                            <>
+                              {formatWebhookStatusLabel(latestWebhookEvent.status)}
+                              {latestWebhookEvent.http_status ? ` • HTTP ${latestWebhookEvent.http_status}` : ""}
+                            </>
+                          )}
+                          {!webhookPending && !latestWebhookEvent && "No deliveries recorded yet."}
+                        </p>
+                      </div>
+                      {latestWebhookTimestamp && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap font-mono">
+                          {latestWebhookTimestamp}
+                        </span>
+                      )}
+                    </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <WebhookStat
-                    label="Delivered"
-                    value={webhookSuccessCount}
-                    tone={webhookSuccessCount > 0 ? "success" : "muted"}
-                  />
-                  <WebhookStat
-                    label="Failed"
-                    value={webhookFailureCount}
-                    tone={webhookFailureCount > 0 ? "danger" : "muted"}
-                  />
-                  <WebhookStat
-                    label={"Attempts"}
-                    value={webhookSuccessCount + webhookFailureCount}
-                  />
-                </div>
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50">
+                      <WebhookStat
+                        label="Delivered"
+                        value={webhookSuccessCount}
+                        tone={webhookSuccessCount > 0 ? "success" : "muted"}
+                      />
+                      <WebhookStat
+                        label="Failed"
+                        value={webhookFailureCount}
+                        tone={webhookFailureCount > 0 ? "danger" : "muted"}
+                      />
+                      <WebhookStat
+                        label="Attempts"
+                        value={webhookSuccessCount + webhookFailureCount}
+                      />
+                    </div>
 
-                {latestWebhookEvent?.error_message && (
-                  <div className="text-body-small text-destructive bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
-                    {latestWebhookEvent.error_message}
-                  </div>
-                )}
-              </HoverCardContent>
-            </HoverCard>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4 text-body-small">
-          <div className="flex items-center gap-2 group">
-            <span>Agent:</span>
-            <code className="font-mono text-xs text-foreground bg-muted/30 px-1.5 py-0.5 rounded">
-              {execution.agent_node_id}
-            </code>
-            <CopyButton
-              value={execution.agent_node_id}
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 p-0 opacity-0 transition-opacity group-hover:opacity-100 [&_svg]:h-3 [&_svg]:w-3"
-              tooltip="Copy agent node ID"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span>DID:</span>
-            <DIDDisplay
-              nodeId={execution.agent_node_id}
-              variant="inline"
-              className="text-xs"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 group">
-            <span>ID:</span>
-            <code className="font-mono text-xs text-foreground bg-muted/30 px-1.5 py-0.5 rounded">
-              {truncateId(execution.execution_id)}
-            </code>
-            <CopyButton
-              value={execution.execution_id}
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 p-0 opacity-0 transition-opacity group-hover:opacity-100 [&_svg]:h-3 [&_svg]:w-3"
-              tooltip="Copy execution ID"
-            />
-          </div>
-
-          {vcLoading ? (
-            <div className="flex items-center gap-2">
-              <span>VC:</span>
-              <span className="text-body-small">Loading…</span>
+                    {latestWebhookEvent?.error_message && (
+                      <div className="text-xs font-mono text-destructive bg-destructive/5 border border-destructive/20 rounded px-2 py-1.5 break-all">
+                        {latestWebhookEvent.error_message}
+                      </div>
+                    )}
+                  </HoverCardContent>
+                </HoverCard>
+              )}
             </div>
-          ) : vcStatus?.has_vc ? (
-            <div className="flex items-center gap-2">
-              <span>VC:</span>
-              <VerifiableCredentialBadge
-                hasVC={vcStatus.has_vc}
-                status={vcStatus.status}
-                vcData={vcStatus as any}
-                executionId={execution.execution_id}
-                showCopyButton={false}
-                showVerifyButton={false}
-              />
-            </div>
-          ) : null}
-        </div>
 
-        <div className="flex flex-wrap items-center gap-4 text-body-small">
-          <div className="flex items-center gap-2 group">
-            <span>Workflow:</span>
-            <button
-              type="button"
-              onClick={handleNavigateWorkflow}
-              className="font-medium text-foreground hover:underline"
-            >
-              {execution.workflow_name ?? truncateId(execution.workflow_id)}
-            </button>
-            <CopyButton
-              value={execution.workflow_id}
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 p-0 opacity-0 transition-opacity group-hover:opacity-100 [&_svg]:h-3 [&_svg]:w-3"
-              tooltip="Copy workflow ID"
-            />
-          </div>
-
-          {execution.session_id && (
-            <div className="flex items-center gap-2 group">
-              <span>Session:</span>
-              <button
-                type="button"
-                onClick={handleNavigateSession}
-                className="font-medium text-foreground hover:underline"
-              >
-                {truncateId(execution.session_id)}
-              </button>
-              <CopyButton
-                value={execution.session_id}
-                variant="ghost"
-                size="icon"
-                className="h-4 w-4 p-0 opacity-0 transition-opacity group-hover:opacity-100 [&_svg]:h-3 [&_svg]:w-3"
-                tooltip="Copy session ID"
-              />
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 group">
-            <span>Request:</span>
-            <code className="font-mono text-xs text-foreground bg-muted/30 px-1.5 py-0.5 rounded">
-              {execution.agentfield_request_id
-                ? truncateId(execution.agentfield_request_id)
-                : "n/a"}
-            </code>
-            {execution.agentfield_request_id && (
-              <CopyButton
-                value={execution.agentfield_request_id}
-                variant="ghost"
-                size="icon"
-                className="h-4 w-4 p-0 opacity-0 transition-opacity group-hover:opacity-100 [&_svg]:h-3 [&_svg]:w-3"
-                tooltip="Copy request ID"
-              />
+            {/* Tags Row */}
+            {workflowTags.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {workflowTags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="font-normal text-[10px] px-1.5 py-0">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
             )}
           </div>
+
+          {/* Primary Actions / VC Status */}
+          <div className="flex items-center gap-2">
+             {vcLoading ? (
+                <Badge variant="outline" className="animate-pulse">Loading VC...</Badge>
+              ) : vcStatus?.has_vc ? (
+                <VerifiableCredentialBadge
+                  hasVC={vcStatus.has_vc}
+                  status={vcStatus.status}
+                  vcData={vcStatus as any}
+                  executionId={execution.execution_id}
+                  showCopyButton={false}
+                  showVerifyButton={false}
+                />
+              ) : null}
+          </div>
         </div>
 
-        {workflowTags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-body-small">
-            <span>Tags:</span>
-            <div className="flex flex-wrap gap-2">
-              {workflowTags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="font-normal">
-                  {tag}
-                </Badge>
-              ))}
+        {/* Metadata Grid - The "Developer Dashboard" Look */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg border border-border/60 bg-muted/20">
+          {/* Column 1: Identity */}
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="text-label">Execution ID</div>
+              <div className="flex items-center gap-2 group">
+                <code className="font-mono text-xs text-foreground">
+                  {execution.execution_id}
+                </code>
+                <CopyButton
+                  value={execution.execution_id}
+                  variant="ghost"
+                  size="icon-sm"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-label">Agent Node</div>
+              <div className="flex items-center gap-2 group">
+                <code className="font-mono text-xs text-foreground">
+                  {truncateId(execution.agent_node_id)}
+                </code>
+                <DIDDisplay
+                  nodeId={execution.agent_node_id}
+                  variant="inline"
+                  className="text-[10px]"
+                />
+                <CopyButton
+                  value={execution.agent_node_id}
+                  variant="ghost"
+                  size="icon-sm"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </div>
             </div>
           </div>
-        )}
 
-        <div className="flex flex-wrap items-center gap-6 pt-2 text-sm">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Duration:</span>
-            <span className="font-medium text-foreground">
-              {formatDuration(execution.duration_ms)}
-            </span>
+          {/* Column 2: Context */}
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="text-label">Workflow</div>
+              <div className="flex items-center gap-2 group">
+                <button
+                  type="button"
+                  onClick={handleNavigateWorkflow}
+                  className="font-medium text-sm text-foreground hover:underline truncate max-w-[180px] text-left"
+                >
+                  {execution.workflow_name ?? truncateId(execution.workflow_id)}
+                </button>
+                <CopyButton
+                  value={execution.workflow_id}
+                  variant="ghost"
+                  size="icon-sm"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </div>
+            </div>
+            {execution.session_id && (
+              <div className="space-y-1">
+                <div className="text-label">Session</div>
+                <div className="flex items-center gap-2 group">
+                  <button
+                    type="button"
+                    onClick={handleNavigateSession}
+                    className="font-mono text-xs text-foreground hover:underline"
+                  >
+                    {truncateId(execution.session_id)}
+                  </button>
+                  <CopyButton
+                    value={execution.session_id}
+                    variant="ghost"
+                    size="icon-sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <ArrowDown className="w-4 h-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Input:</span>
-            <span className="font-medium text-foreground">
-              {formatBytes(execution.input_size)}
-            </span>
+          {/* Column 3: Performance */}
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="text-label">Duration</div>
+              <div className="flex items-center gap-1.5 text-sm font-medium font-mono">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                {formatDuration(execution.duration_ms)}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-label">Retries</div>
+              <div className="flex items-center gap-1.5 text-sm font-medium font-mono">
+                <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+                {execution.retry_count}
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <ArrowUp className="w-4 h-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Output:</span>
-            <span className="font-medium text-foreground">
-              {formatBytes(execution.output_size)}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <RotateCcw className="w-4 h-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Retries:</span>
-            <span className="font-medium text-foreground">
-              {execution.retry_count}
-            </span>
+          {/* Column 4: I/O */}
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className="text-label">Data Transfer</div>
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <div className="flex items-center gap-1">
+                  <ArrowDown className="w-3 h-3 text-muted-foreground" />
+                  <span>{formatBytes(execution.input_size)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <ArrowUp className="w-3 h-3 text-muted-foreground" />
+                  <span>{formatBytes(execution.output_size)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-label">Request ID</div>
+              <div className="flex items-center gap-2 group">
+                <code className="font-mono text-xs text-muted-foreground">
+                  {execution.agentfield_request_id
+                    ? truncateId(execution.agentfield_request_id)
+                    : "n/a"}
+                </code>
+                {execution.agentfield_request_id && (
+                  <CopyButton
+                    value={execution.agentfield_request_id}
+                    variant="ghost"
+                    size="icon-sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

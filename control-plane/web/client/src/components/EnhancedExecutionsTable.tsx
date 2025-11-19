@@ -226,11 +226,11 @@ export function EnhancedExecutionsTable({
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="overflow-hidden border-border/60 shadow-sm">
         <CardContent className="p-0">
-          <div className="border-b border-border px-3 py-2 bg-muted/40">
+          <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 py-2.5">
             <div
-              className="grid items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+              className="grid items-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
               style={{ gridTemplateColumns: COLUMN_TEMPLATE }}
             >
               <SortableHeaderCell
@@ -262,7 +262,7 @@ export function EnhancedExecutionsTable({
                 onSortChange={onSortChange}
                 align="right"
               />
-              <div className="flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <ShieldCheck className="h-3 w-3" /> VC
               </div>
               <SortableHeaderCell
@@ -272,11 +272,11 @@ export function EnhancedExecutionsTable({
                 sortOrder={sortOrder}
                 onSortChange={onSortChange}
               />
-              <div className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground"></div>
+              <div className="text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"></div>
             </div>
           </div>
 
-          <div ref={parentRef} className="relative h-[60vh] overflow-y-auto">
+          <div ref={parentRef} className="relative h-[60vh] overflow-y-auto bg-muted/5">
             <div
               style={{
                 height: `${virtualizer.getTotalSize()}px`,
@@ -293,7 +293,7 @@ export function EnhancedExecutionsTable({
                 return (
                   <div
                     key={virtualRow.key}
-                    className="absolute left-0 right-0 px-3"
+                    className="absolute left-0 right-0 px-2"
                     style={{
                       transform: `translateY(${virtualRow.start}px)`,
                       height: `${virtualRow.size}px`,
@@ -301,15 +301,18 @@ export function EnhancedExecutionsTable({
                   >
                     <div
                       className={cn(
-                        "grid h-full cursor-pointer items-center rounded-lg px-3 transition-colors",
-                        "bg-card hover:bg-[var(--row-hover-bg)] dark:hover:bg-[var(--dark-row-hover-bg)]"
+                        "grid h-full cursor-pointer items-center rounded-md px-3 transition-all duration-200 relative overflow-hidden group",
+                        "bg-card border border-transparent hover:border-border/60 hover:shadow-sm hover:bg-card"
                       )}
                       style={{ gridTemplateColumns: COLUMN_TEMPLATE }}
                       onMouseEnter={() => setHoveredRow(execution.execution_id)}
                       onMouseLeave={() => setHoveredRow(null)}
                       onClick={() => onExecutionClick?.(execution)}
                     >
-                      <div className="flex items-center">
+                      {/* Hover Accent Bar */}
+                      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                      <div className="flex items-center pl-2">
                         <StatusPill status={execution.status} />
                       </div>
 
@@ -332,13 +335,13 @@ export function EnhancedExecutionsTable({
                       </div>
 
                       <div className="flex items-center">
-                        <span className="text-body-small">
+                        <span className="text-xs text-muted-foreground font-mono">
                           {execution.relative_time}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-end">
-                        <span className="font-mono text-body-small">
+                        <span className="font-mono text-xs text-foreground">
                           {execution.duration_display}
                         </span>
                       </div>
@@ -350,7 +353,7 @@ export function EnhancedExecutionsTable({
                       </div>
 
                       <div className="flex items-center">
-                        <span className="font-mono text-body-small">
+                        <span className="font-mono text-xs text-muted-foreground group-hover:text-foreground transition-colors">
                           …{execution.execution_id.slice(-8)}
                         </span>
                       </div>

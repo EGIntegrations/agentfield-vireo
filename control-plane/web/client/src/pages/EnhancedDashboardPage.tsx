@@ -242,13 +242,13 @@ export function EnhancedDashboardPage() {
   const generatedAt = formatTimestamp(data.generated_at);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Dashboard"
         description="Monitor agent health, workflow performance, and system throughput across your distributed cluster."
         aside={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="pill" size="sm">
+            <Badge variant="pill" size="sm" className="font-mono">
               {generatedAt}
             </Badge>
             <Button
@@ -276,30 +276,32 @@ export function EnhancedDashboardPage() {
         />
       )}
 
-      <OverviewStrip
-        overview={data.overview}
-        trends={data.execution_trends.last_24h}
-      />
+      <div className="animate-slide-in" style={{ animationDelay: "50ms" }}>
+        <OverviewStrip
+          overview={data.overview}
+          trends={data.execution_trends.last_24h}
+        />
+      </div>
 
       <ResponsiveGrid
         columns={{ base: 1, md: 6, lg: 12 }}
         flow="dense"
         className="auto-rows-[minmax(220px,auto)] md:auto-rows-[minmax(240px,auto)] lg:auto-rows-[minmax(260px,auto)]"
-        gap="lg"
+        gap="md"
       >
-        <ResponsiveGrid.Item span={{ md: 6, lg: 7, xl: 8, "2xl": 7 }}>
+        <ResponsiveGrid.Item span={{ md: 6, lg: 7, xl: 8, "2xl": 7 }} className="animate-slide-in" style={{ animationDelay: "100ms" }}>
           <ExecutionTrendsCard
             trendPoints={data.execution_trends.last_7_days}
             windowMetrics={data.execution_trends.last_24h}
           />
         </ResponsiveGrid.Item>
-        <ResponsiveGrid.Item span={{ md: 3, lg: 5, xl: 4, "2xl": 5 }}>
+        <ResponsiveGrid.Item span={{ md: 3, lg: 5, xl: 4, "2xl": 5 }} className="animate-slide-in" style={{ animationDelay: "150ms" }}>
           <IncidentPanel incidents={data.incidents} />
         </ResponsiveGrid.Item>
-        <ResponsiveGrid.Item span={{ md: 3, lg: 7, xl: 6, "2xl": 7 }}>
+        <ResponsiveGrid.Item span={{ md: 3, lg: 7, xl: 6, "2xl": 7 }} className="animate-slide-in" style={{ animationDelay: "200ms" }}>
           <WorkflowInsightsPanel insights={data.workflows} />
         </ResponsiveGrid.Item>
-        <ResponsiveGrid.Item span={{ md: 6, lg: 5, xl: 6, "2xl": 5 }}>
+        <ResponsiveGrid.Item span={{ md: 6, lg: 5, xl: 6, "2xl": 5 }} className="animate-slide-in" style={{ animationDelay: "250ms" }}>
           <ReasonerActivityPanel
             reasoners={reasonerStats}
             agentSummary={data.agent_health}
@@ -396,13 +398,13 @@ function ExecutionTrendsCard({
       interactive={false}
       className="flex h-full flex-col"
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-5 pb-2">
         <CardTitle className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4" /> Velocity & reliability
         </CardTitle>
         <Badge variant="pill">Last 7 days</Badge>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-8">
+      <CardContent className="flex flex-1 flex-col gap-6 p-5 pt-0">
         <div className="h-52 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
@@ -507,11 +509,11 @@ interface MetricTileProps {
 
 function MetricTile({ label, value, helper }: MetricTileProps) {
   return (
-    <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
-      <p className="text-caption text-text-tertiary">{label}</p>
-      <p className="mt-2 text-heading-2">{value}</p>
+    <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 transition-all hover:bg-muted/30">
+      <p className="text-label">{label}</p>
+      <p className="mt-2 text-heading-2 font-mono tracking-tight">{value}</p>
       {helper && (
-        <p className="text-body-small text-text-secondary mt-1">{helper}</p>
+        <p className="text-xs text-text-secondary mt-1 font-medium">{helper}</p>
       )}
     </div>
   );
@@ -521,6 +523,24 @@ interface WorkflowInsightsPanelProps {
   insights: EnhancedDashboardResponse["workflows"];
 }
 
+function ProgressBar({ value, className }: { value: number; className?: string }) {
+  const colorClass =
+    value >= 95
+      ? "bg-emerald-500"
+      : value >= 80
+        ? "bg-amber-500"
+        : "bg-destructive";
+
+  return (
+    <div className={cn("h-1.5 w-full rounded-full bg-muted overflow-hidden", className)}>
+      <div
+        className={cn("h-full rounded-full transition-all duration-500", colorClass)}
+        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+      />
+    </div>
+  );
+}
+
 function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
   return (
     <Card
@@ -528,44 +548,53 @@ function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
       interactive={false}
       className="flex h-full flex-col"
     >
-      <CardHeader>
+      <CardHeader className="p-5 pb-2">
         <CardTitle className="flex items-center gap-2">
           <Zap className="h-4 w-4" /> Workflow intelligence
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col min-h-0">
-        <ResponsiveGrid variant="detail" gap="lg" align="start" className="flex-1 min-h-0">
+      <CardContent className="flex flex-1 flex-col min-h-0 p-5 pt-0">
+        <ResponsiveGrid variant="detail" gap="md" align="start" className="flex-1 min-h-0">
           <InsightsGroup
             title="Top workflows"
             empty="No executions recorded in the last 7 days."
             items={insights.top_workflows}
-            render={(workflow: WorkflowStat) => (
+            render={(workflow: WorkflowStat, index: number) => (
               <Link
                 to={`/workflows/${workflow.workflow_id}/enhanced`}
                 className={cn(
-                  "block transition-colors hover:border-border hover:bg-muted/30 min-w-0",
+                  "group relative block transition-all hover:border-border hover:bg-muted/30 min-w-0",
                   cardVariants({ variant: "muted", interactive: false }),
-                  "px-3 py-3"
+                  "pl-10 pr-3 py-3"
                 )}
               >
-                <div className="space-y-1 text-sm text-foreground min-w-0">
-                  <p className="font-medium text-foreground truncate">
-                    {workflow.name || workflow.workflow_id}
-                  </p>
-                  <p className="text-body-small text-text-secondary">
-                    {numberFormatter.format(workflow.total_executions)} runs ·{" "}
-                    {formatPercentage(workflow.success_rate)} success
-                  </p>
+                {/* Rank Badge */}
+                <div className="absolute left-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-background border border-border text-[10px] font-mono font-medium text-muted-foreground shadow-sm group-hover:border-primary/50 group-hover:text-primary transition-colors">
+                  {index + 1}
                 </div>
-                <div className="mt-2 min-w-0">
-                  <Badge
-                    variant="outline"
-                    className="inline-flex justify-start rounded-full text-[10px] leading-4 text-left max-w-full"
-                  >
-                    <span className="truncate">
-                      Last run {formatTimestamp(workflow.last_activity)}
+
+                <div className="space-y-2 min-w-0">
+                  <div className="flex justify-between items-start gap-2">
+                    <p className="font-medium text-sm text-foreground truncate">
+                      {workflow.name || workflow.workflow_id}
+                    </p>
+                    <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                      {numberFormatter.format(workflow.total_executions)} runs
                     </span>
-                  </Badge>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Success Rate</span>
+                      <span className={cn(
+                        "font-mono",
+                        workflow.success_rate >= 95 ? "text-emerald-500" : workflow.success_rate >= 80 ? "text-amber-500" : "text-destructive"
+                      )}>
+                        {formatPercentage(workflow.success_rate)}
+                      </span>
+                    </div>
+                    <ProgressBar value={workflow.success_rate} />
+                  </div>
                 </div>
               </Link>
             )}
@@ -580,21 +609,28 @@ function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
                 <Link
                   to={`/executions/${run.execution_id}`}
                   className={cn(
-                    "block transition-colors hover:border-border hover:bg-muted/20 min-w-0",
+                    "group block transition-all hover:border-primary/30 hover:shadow-md min-w-0 relative overflow-hidden",
                     cardVariants({ variant: "muted", interactive: false }),
-                    "px-3 py-2 text-xs"
+                    "px-3 py-2.5 text-xs bg-background/50 backdrop-blur-sm border-primary/20"
                   )}
                 >
+                  <div className="absolute top-0 left-0 w-0.5 h-full bg-primary/50 group-hover:bg-primary transition-colors" />
                   <div className="flex items-center justify-between min-w-0 gap-2">
-                    <p className="font-medium text-foreground truncate">
-                      {run.name || run.workflow_id}
-                    </p>
-                    <span className="text-text-tertiary flex-shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                      </span>
+                      <p className="font-medium text-foreground truncate">
+                        {run.name || run.workflow_id}
+                      </p>
+                    </div>
+                    <span className="text-primary font-mono text-[10px] flex-shrink-0 bg-primary/10 px-1.5 py-0.5 rounded-full">
                       {formatDuration(run.elapsed_ms)}
                     </span>
                   </div>
-                  <p className="mt-1 text-text-secondary truncate">
-                    {run.execution_id} · {run.reasoner_id}
+                  <p className="mt-1.5 pl-4 text-muted-foreground truncate font-mono text-[10px]">
+                    {run.execution_id}
                   </p>
                 </Link>
               )}
@@ -611,12 +647,19 @@ function WorkflowInsightsPanel({ insights }: WorkflowInsightsPanelProps) {
                     "px-3 py-2 text-xs min-w-0"
                   )}
                 >
-                  <p className="font-medium text-foreground truncate">
-                    {execution.name || execution.workflow_id}
-                  </p>
-                  <p className="mt-1 text-text-secondary truncate">
-                    {formatDuration(execution.duration_ms)} · Completed{" "}
-                    {formatTimestamp(execution.completed_at)}
+                  <div className="flex justify-between items-center gap-2">
+                    <p className="font-medium text-foreground truncate">
+                      {execution.name || execution.workflow_id}
+                    </p>
+                    <span className={cn(
+                      "font-mono text-[10px] px-1.5 py-0.5 rounded-full",
+                      execution.duration_ms > 60000 ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"
+                    )}>
+                      {formatDuration(execution.duration_ms)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground truncate text-[10px]">
+                    Completed {formatTimestamp(execution.completed_at)}
                   </p>
                 </div>
               )}
@@ -633,7 +676,7 @@ interface InsightsGroupProps<T> {
   title: string;
   empty: string;
   items: T[];
-  render: (item: T) => React.ReactElement;
+  render: (item: T, index: number) => React.ReactElement;
 }
 
 function InsightsGroup<T>({
@@ -644,15 +687,15 @@ function InsightsGroup<T>({
 }: InsightsGroupProps<T>) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-caption text-text-tertiary">
-        <GitCommit className="h-4 w-4" />
+      <div className="flex items-center gap-2 text-label">
+        <GitCommit className="h-3.5 w-3.5" />
         {title}
       </div>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {items.length === 0 ? (
-          <p className="text-body-small text-text-secondary">{empty}</p>
+          <p className="text-xs text-muted-foreground italic pl-1">{empty}</p>
         ) : (
-          items.map((item, index) => <div key={index}>{render(item)}</div>)
+          items.map((item, index) => <div key={index}>{render(item, index)}</div>)
         )}
       </div>
     </div>
@@ -670,12 +713,12 @@ function IncidentPanel({ incidents }: IncidentPanelProps) {
       interactive={false}
       className="flex h-full flex-col"
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="p-5 pb-2">
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-destructive" /> Incident log
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">
+      <CardContent className="flex flex-1 flex-col gap-4 p-5 pt-0">
         <div className="flex items-center justify-between text-body">
           <span className="text-text-secondary">
             {incidents.length} issues in the last 7 days
@@ -768,7 +811,7 @@ function ReasonerActivityPanel({
 }: ReasonerActivityPanelProps) {
   return (
     <Card variant="surface" interactive={false} className="flex h-full flex-col">
-      <CardHeader className="space-y-4">
+      <CardHeader className="space-y-4 p-5 pb-2">
         <CardTitle className="flex items-center gap-2">
           <Cpu className="h-4 w-4" /> Reasoner activity
         </CardTitle>
@@ -790,7 +833,7 @@ function ReasonerActivityPanel({
           />
         </div>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4 min-h-0">
+      <CardContent className="flex flex-1 flex-col gap-4 min-h-0 p-5 pt-0">
         {reasoners.length === 0 ? (
           <p className="text-body-small">
             No recent reasoner activity. Trigger a workflow or execution to

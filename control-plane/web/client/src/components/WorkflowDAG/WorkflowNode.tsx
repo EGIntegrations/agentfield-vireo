@@ -307,12 +307,12 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   }
 
   const baseShadow =
-    "0 12px 24px -14px color-mix(in srgb, var(--foreground) 22%, transparent)";
+    "0 4px 12px -2px color-mix(in srgb, var(--foreground) 10%, transparent), 0 2px 6px -1px color-mix(in srgb, var(--foreground) 6%, transparent)";
   const accentShadow = `0 0 0 1px ${borderColor}`;
-  const glowShadow = isDimmed ? "" : `0 0 18px ${glowColor}`;
+  const glowShadow = isDimmed ? "" : `0 0 12px -2px ${glowColor}`;
   const compositeShadow = [accentShadow, baseShadow, glowShadow].filter(Boolean).join(", ");
 
-  const baseBackground = `linear-gradient(135deg, color-mix(in srgb, ${statusColorVar} 12%, transparent), var(--card))`;
+  const baseBackground = `linear-gradient(145deg, color-mix(in srgb, ${statusColorVar} 8%, transparent), var(--card))`;
   let background = baseBackground;
 
   if (!hasHighlight) {
@@ -357,22 +357,22 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   return (
     <div
       className={cn(
-        "relative h-[100px] rounded-xl border-2 bg-card/95 backdrop-blur-sm transition-transform duration-200",
-        "cursor-pointer group overflow-hidden shadow-lg",
-        !isDimmed && "hover:scale-[1.02]"
+        "relative h-[100px] rounded-xl border bg-card/90 backdrop-blur-md transition-all duration-300 animate-fade-in",
+        "cursor-pointer group overflow-hidden",
+        !isDimmed && "hover:scale-[1.01] hover:shadow-xl"
       )}
       style={{
         width: `${nodeWidth}px`,
         borderColor,
         boxShadow: compositeShadow,
-        opacity: isDimmed ? 0.35 : 1,
+        opacity: isDimmed ? 0.4 : 1,
         filter: isDimmed ? "grayscale(65%) saturate(70%)" : undefined,
         background,
       }}
     >
       {/* Agent color left border accent */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
+        className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl opacity-80"
         style={{
           background: `linear-gradient(to bottom, ${agentColor.primary}, ${agentColor.border})`,
         }}

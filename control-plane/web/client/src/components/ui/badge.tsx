@@ -13,7 +13,7 @@ import {
 import type { IconComponent, IconWeight } from "@/components/ui/icon-bridge"
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-lg border border-transparent px-2.5 py-1 text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+  "inline-flex items-center gap-1.5 rounded-md border border-transparent px-2 py-0.5 text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
   {
     variants: {
       variant: {
@@ -31,32 +31,32 @@ const badgeVariants = cva(
         outline:
           "text-text-primary border border-border bg-transparent hover:bg-bg-hover shadow-sm",
         metadata:
-          "rounded-md bg-muted/40 text-text-secondary border border-border/60 px-2 py-1 text-body-small font-medium",
+          "rounded-md bg-muted/40 text-text-secondary border border-border/60 px-1.5 py-0.5 text-[10px] font-medium font-mono",
         count:
-          "rounded-full bg-bg-secondary text-text-primary border border-border-secondary px-2 py-0.5 text-caption font-semibold uppercase tracking-wide",
+          "rounded-full bg-bg-secondary text-text-primary border border-border-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
         pill:
-          "rounded-full bg-muted/30 text-text-primary border border-border/40 px-3 py-1 text-body-small",
+          "rounded-full bg-muted/30 text-text-primary border border-border/40 px-2.5 py-0.5 text-[11px]",
 
         // Status variants with standardized colors and icons
         success:
-          cn(getStatusBadgeClasses("success" satisfies StatusTone)),
+          cn(getStatusBadgeClasses("success" satisfies StatusTone), "font-mono tracking-tight"),
         failed:
-          cn(getStatusBadgeClasses("error" satisfies StatusTone)),
+          cn(getStatusBadgeClasses("error" satisfies StatusTone), "font-mono tracking-tight"),
         running:
-          cn(getStatusBadgeClasses("info" satisfies StatusTone)),
+          cn(getStatusBadgeClasses("info" satisfies StatusTone), "font-mono tracking-tight"),
         pending:
-          cn(getStatusBadgeClasses("warning" satisfies StatusTone)),
+          cn(getStatusBadgeClasses("warning" satisfies StatusTone), "font-mono tracking-tight"),
 
         // Additional status variants for degraded states
         degraded:
-          cn(getStatusBadgeClasses("warning" satisfies StatusTone)),
+          cn(getStatusBadgeClasses("warning" satisfies StatusTone), "font-mono tracking-tight"),
         unknown:
-          cn(getStatusBadgeClasses("neutral" satisfies StatusTone)),
+          cn(getStatusBadgeClasses("neutral" satisfies StatusTone), "font-mono tracking-tight"),
       },
       size: {
-        sm: "px-2 py-0.5 text-xs",
-        md: "px-2.5 py-1 text-xs",
-        lg: "px-3 py-1.5 text-sm",
+        sm: "px-1.5 py-0 text-[10px]",
+        md: "px-2 py-0.5 text-xs",
+        lg: "px-3 py-1 text-sm",
       },
     },
     defaultVariants: {
