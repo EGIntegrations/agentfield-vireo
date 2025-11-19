@@ -101,6 +101,16 @@ export AGENT_CALLBACK_URL="http://host.docker.internal:8001"
 
 ---
 
+## 🎨 See It In Action
+
+<div align="center">
+<img src="assets/UI.png" alt="AgentField Dashboard" width="100%" />
+<br/>
+<i>Real-time Observability • Execution DAGs • Verifiable Credentials</i>
+</div>
+
+---
+
 ## 🧠 Why AgentField?
 
 **Software is starting to behave less like scripts and more like reasoning systems.**
