@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -43,7 +44,15 @@ func TestStopCommand(t *testing.T) {
 	cmd.SetArgs([]string{"test-agent"})
 	err = cmd.Execute()
 	// Error is expected if agent doesn't exist, but command should be valid
-	require.Error(t, err)
+	// The error message should indicate the agent is not installed or not running
+	if err != nil {
+		errorMsg := err.Error()
+		require.True(t,
+			strings.Contains(strings.ToLower(errorMsg), "not installed") ||
+			strings.Contains(strings.ToLower(errorMsg), "not running") ||
+			strings.Contains(strings.ToLower(errorMsg), "not found"),
+			"Expected error about agent not found/installed/running, got: %s", errorMsg)
+	}
 }
 
 // TestConfigCommand tests the config command

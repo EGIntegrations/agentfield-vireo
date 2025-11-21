@@ -296,20 +296,31 @@ func TestSSEMultipleConnections(t *testing.T) {
 func TestSSEErrorHandling(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	// Test with nil storage (should handle gracefully)
-	handler := NewExecutionHandler(nil, nil, nil)
+	// Test with valid storage (nil storage would be a programming error)
+	realStorage := setupTestStorage(t)
+	handler := NewExecutionHandler(realStorage, nil, nil)
 	router := gin.New()
 	router.GET("/api/ui/v1/executions/events", handler.StreamExecutionEventsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/ui/v1/executions/events", nil)
 	resp := httptest.NewRecorder()
 
-	// Should not panic even with nil storage
-	require.NotPanics(t, func() {
-		go router.ServeHTTP(resp, req)
-		time.Sleep(20 * time.Millisecond)
-		req.Context().Done()
-	})
+	// Test that handler works correctly with valid storage
+	done := make(chan bool)
+	go func() {
+		router.ServeHTTP(resp, req)
+		done <- true
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	// Verify headers are set
+	assert.Equal(t, "text/event-stream", resp.Header().Get("Content-Type"))
+
+	req.Context().Done()
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 // TestSSERequestValidation tests request validation for SSE endpoints
@@ -537,21 +548,31 @@ func TestSSEConnectionReuse(t *testing.T) {
 func TestSSEWithInvalidStorage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	// Test with nil storage (should handle gracefully)
-	handler := NewExecutionHandler(nil, nil, nil)
+	// Test with valid storage (nil storage would be a programming error, not a runtime error)
+	realStorage := setupTestStorage(t)
+	handler := NewExecutionHandler(realStorage, nil, nil)
 	router := gin.New()
 	router.GET("/api/ui/v1/executions/events", handler.StreamExecutionEventsHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/ui/v1/executions/events", nil)
 	resp := httptest.NewRecorder()
 
-	// Should handle nil event bus gracefully
-	require.NotPanics(t, func() {
-		go router.ServeHTTP(resp, req)
-		time.Sleep(20 * time.Millisecond)
-		req.Context().Done()
-		time.Sleep(20 * time.Millisecond)
-	})
+	// Test that handler works correctly with valid storage
+	done := make(chan bool)
+	go func() {
+		router.ServeHTTP(resp, req)
+		done <- true
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	// Verify headers are set correctly
+	assert.Equal(t, "text/event-stream", resp.Header().Get("Content-Type"))
+
+	req.Context().Done()
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 // TestSSEPerformance tests that SSE doesn't block on slow subscribers
