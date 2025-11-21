@@ -417,9 +417,9 @@ func TestBuildExecutionDAG_MixedStatuses(t *testing.T) {
 
 	_, _, status, _, _, _, _ := buildExecutionDAG(executions)
 
-	// deriveOverallStatus checks for "failed" first, so "failed" has priority over "running"
-	// This is the actual behavior: failed > running > succeeded
-	require.Equal(t, "failed", status)
+	// deriveOverallStatus priority: running > failed > succeeded
+	// Running has highest priority as it indicates active workflow
+	require.Equal(t, "running", status)
 }
 
 func TestBuildExecutionDAG_OrphanedChild(t *testing.T) {
