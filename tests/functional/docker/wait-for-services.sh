@@ -14,8 +14,8 @@ attempt=0
 while [ $attempt -lt $MAX_ATTEMPTS ]; do
     attempt=$((attempt + 1))
     
-    # Try to reach the health endpoint
-    if wget --spider --timeout=2 --tries=1 "${HEALTH_ENDPOINT}" 2>/dev/null; then
+    # Try to reach the health endpoint with a simple GET request
+    if curl --silent --show-error --fail --max-time 2 "${HEALTH_ENDPOINT}" >/dev/null; then
         echo "✓ Control plane is ready!"
         exit 0
     fi
@@ -26,4 +26,3 @@ done
 
 echo "✗ Control plane failed to become ready after $MAX_ATTEMPTS attempts"
 exit 1
-

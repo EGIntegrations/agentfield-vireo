@@ -10,6 +10,7 @@ This test validates the end-to-end flow:
 """
 
 import asyncio
+import os
 import socket
 import threading
 from typing import Dict
@@ -59,29 +60,33 @@ async def test_hello_world_with_openrouter(
         """
         # Use the agent's AI capability to answer the question
         response = await agent.ai(
-            prompt=f"Answer this math question with just the number, no explanation: {question}",
-            system_prompt="You are a helpful math assistant. Provide only the numeric answer.",
+            system="You are a helpful math assistant. Provide only the numeric answer.",
+            user=f"Answer this math question with just the number, no explanation: {question}",
         )
+        answer_text = getattr(response, "text", None) or str(response)
         
         return {
             "question": question,
-            "answer": response.strip(),
+            "answer": answer_text.strip(),
         }
     
     # ========================================================================
     # Step 3: Start agent server on a free port
     # ========================================================================
     # Find a free port
+    agent_bind_host = os.environ.get("TEST_AGENT_BIND_HOST", "127.0.0.1")
+    agent_callback_host = os.environ.get("TEST_AGENT_CALLBACK_HOST", "127.0.0.1")
+    
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
+        s.bind((agent_bind_host, 0))
         agent_port = s.getsockname()[1]
     
-    agent.base_url = f"http://127.0.0.1:{agent_port}"
+    agent.base_url = f"http://{agent_callback_host}:{agent_port}"
     
     # Configure and start uvicorn server
     config = uvicorn.Config(
         app=agent,
-        host="127.0.0.1",
+        host=agent_bind_host,
         port=agent_port,
         log_level="error",
         access_log=False,
@@ -104,6 +109,8 @@ async def test_hello_world_with_openrouter(
         # Step 4: Register agent with control plane
         # ====================================================================
         await agent.agentfield_handler.register_with_agentfield_server(agent_port)
+        # Disable AgentField callback handshakes so reasoner responses remain synchronous
+        agent.agentfield_server = None
         
         # Wait for registration to propagate
         await asyncio.sleep(2)
@@ -217,4 +224,3 @@ async def test_control_plane_health(async_http_client):
     assert "status" in health_data or response.text == "OK" or response.status_code == 200
     
     print("✓ Control plane health check passed")
-

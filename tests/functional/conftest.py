@@ -15,6 +15,11 @@ import httpx
 import pytest
 from agentfield import Agent, AIConfig
 
+pytest_plugins = ("pytest_asyncio",)
+
+AGENT_BIND_HOST = os.environ.get("TEST_AGENT_BIND_HOST", "127.0.0.1")
+AGENT_CALLBACK_HOST = os.environ.get("TEST_AGENT_CALLBACK_HOST", "127.0.0.1")
+
 
 # ============================================================================
 # Environment and Configuration Fixtures
@@ -202,15 +207,15 @@ async def registered_agent(
     # Find a free port
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
+        s.bind((AGENT_BIND_HOST, 0))
         port = s.getsockname()[1]
     
     # Start agent in background thread
-    agent.base_url = f"http://127.0.0.1:{port}"
+    agent.base_url = f"http://{AGENT_CALLBACK_HOST}:{port}"
     
     config = uvicorn.Config(
         app=agent,
-        host="127.0.0.1",
+        host=AGENT_BIND_HOST,
         port=port,
         log_level="error",
         access_log=False,
@@ -231,6 +236,7 @@ async def registered_agent(
     # Register with control plane
     try:
         await agent.agentfield_handler.register_with_agentfield_server(port)
+        agent.agentfield_server = None
         
         # Wait for registration to complete
         await asyncio.sleep(1)
@@ -272,4 +278,3 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "openrouter: Tests that require OpenRouter API access"
     )
-

@@ -11,7 +11,7 @@ install:
 build: control-plane sdk-go sdk-python
 
 control-plane:
-	( cd control-plane && ./scripts/build-ui.sh && go build ./... )
+	( cd control-plane && go build ./... )
 
 sdk-go:
 	( cd sdk/go && go build ./... )
@@ -37,7 +37,7 @@ tidy:
 	( cd sdk/go && go mod tidy )
 
 clean:
-	rm -rf control-plane/bin control-plane/dist control-plane/web/client/dist control-plane/web/client/.ui-build-hash
+	rm -rf control-plane/bin control-plane/dist
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 
 # ============================================================================
@@ -87,8 +87,6 @@ test-functional-ci:
 		echo "❌ Error: OPENROUTER_API_KEY environment variable is not set"; \
 		exit 1; \
 	fi
-	@echo "Building control plane binary..."
-	$(MAKE) control-plane
 	@echo "Running tests with both storage modes..."
 	$(MAKE) test-functional-local || ($(MAKE) test-functional-cleanup-local && exit 1)
 	$(MAKE) test-functional-postgres || ($(MAKE) test-functional-cleanup-postgres && exit 1)

@@ -67,6 +67,11 @@ tests/functional/
 - OpenRouter API key ([get one here](https://openrouter.ai/keys))
 - Make (optional, for convenience)
 
+> **Note:** The functional test Docker Compose files build the complete control plane image
+> via `deployments/docker/Dockerfile.control-plane`. You do **not** need to run `go build`
+> or run separate `npm run build` steps beforehand—the Dockerfile takes care of compiling both the UI
+> and the Go binary in the correct order.
+
 > **⚠️ IMPORTANT: Model Configuration**
 > 
 > All tests MUST use the `OPENROUTER_MODEL` environment variable and NEVER hardcode model names.
@@ -489,4 +494,3 @@ sudo usermod -aG docker $USER
 ## 📝 License
 
 Same as AgentField project (Apache 2.0)
-
