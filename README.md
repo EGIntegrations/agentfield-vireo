@@ -37,6 +37,7 @@ Most frameworks help you *prototype* (Day 1). AgentField helps you *operate* (Da
 *   **How do I prove what the agent did?** (Verifiable Credentials)
 *   **How do I scale to 1M+ concurrent runs?** (Stateless Architecture)
 *   **How do I manage IAM for agents ?** (Identity) 
+*   **How do I integrate it with my backend/frontend ?** (websockets/SSE/webhooks)
 
 Write standard Python (or Go). Get a production-grade distributed system automatically.
 
