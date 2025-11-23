@@ -36,7 +36,7 @@ Most frameworks help you *prototype* (Day 1). AgentField helps you *operate* (Da
 *   **How do I debug a loop?** (Observability)
 *   **How do I prove what the agent did?** (Verifiable Credentials)
 *   **How do I scale to 1M+ concurrent runs?** (Stateless Architecture)
-*   **How do I manage IAM for agents ?** (Identity) 
+*   **How do I manage IAM for agents ?** (Identity)
 *   **How do I integrate it with my backend/frontend ?** (websockets/SSE/webhooks)
 
 Write standard Python (or Go). Get a production-grade distributed system automatically.
@@ -167,10 +167,6 @@ AgentField isn't a framework you extend. It's **infrastructure** that solves the
 *   **DAG Visualization:** See the logic flow in real-time.
 *   **Metrics:** Prometheus endpoints at `/metrics`.
 *   **Logs:** Structured, correlated logs.
-
-### 🔌 Model Context Protocol (MCP)
-*   **Universal Connectivity:** Connect any MCP-compliant tool (Stripe, Slack, PostgreSQL) instantly.
-*   **Standard Interface:** Stop writing custom tool wrappers. Use the ecosystem.
 
 ---
 
