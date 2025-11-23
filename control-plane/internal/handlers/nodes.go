@@ -511,6 +511,7 @@ func RegisterNodeHandler(storageProvider storage.StorageProvider, uiService *ser
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store node: " + err.Error()})
 			return
 		}
+		InvalidateDiscoveryCache()
 
 		logger.Logger.Debug().Msgf("✅ Successfully registered node: %s", newNode.ID)
 
@@ -1295,6 +1296,7 @@ func RegisterServerlessAgentHandler(storageProvider storage.StorageProvider, uiS
 			})
 			return
 		}
+		InvalidateDiscoveryCache()
 
 		logger.Logger.Info().Msgf("✅ Successfully registered serverless agent: %s", newNode.ID)
 

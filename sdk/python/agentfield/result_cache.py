@@ -124,10 +124,10 @@ class ResultCache:
         self.metrics = CacheMetrics()
         self.metrics.max_size = self.config.result_cache_max_size
 
-        # Background cleanup
+        # Background cleanup (event lazily allocated to avoid loop requirements during import)
         self._cleanup_task: Optional[asyncio.Task] = None
         self._cleanup_interval = self.config.cleanup_interval
-        self._shutdown_event = asyncio.Event()
+        self._shutdown_event: Optional[asyncio.Event] = None
 
         logger.debug(
             f"ResultCache initialized with max_size={self.config.result_cache_max_size}, ttl={self.config.result_cache_ttl}"
@@ -155,6 +155,7 @@ class ResultCache:
     async def start(self) -> None:
         """Start the cache and background cleanup task."""
         if self.config.enable_result_caching:
+            self._shutdown_event = asyncio.Event()
             self._cleanup_task = asyncio.create_task(self._cleanup_loop())
             logger.info("ResultCache started with background cleanup")
         else:
@@ -162,7 +163,8 @@ class ResultCache:
 
     async def stop(self) -> None:
         """Stop the cache and cleanup background tasks."""
-        self._shutdown_event.set()
+        if self._shutdown_event is not None:
+            self._shutdown_event.set()
 
         if self._cleanup_task:
             self._cleanup_task.cancel()
@@ -170,6 +172,7 @@ class ResultCache:
                 await self._cleanup_task
             except asyncio.CancelledError:
                 pass
+        self._shutdown_event = None
 
         with self._lock:
             self._cache.clear()
@@ -396,7 +399,11 @@ class ResultCache:
 
     async def _cleanup_loop(self) -> None:
         """Background task for periodic cache cleanup."""
-        while not self._shutdown_event.is_set():
+        shutdown_event = self._shutdown_event
+        if shutdown_event is None:
+            shutdown_event = asyncio.Event()
+            shutdown_event.set()
+        while not shutdown_event.is_set():
             try:
                 await asyncio.sleep(self._cleanup_interval)
 

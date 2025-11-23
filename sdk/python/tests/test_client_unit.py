@@ -1,8 +1,10 @@
 import re
 
 import pytest
+import responses as responses_lib
 
 from agentfield.client import AgentFieldClient
+from agentfield.types import DiscoveryResponse
 
 
 class DummyContext:
@@ -99,3 +101,81 @@ def test_maybe_update_event_stream_headers_without_manager(source_headers, expec
     client._maybe_update_event_stream_headers(source_headers)
 
     assert client._latest_event_stream_headers == expected
+
+
+def test_discover_capabilities_json(responses):
+    payload = {
+        "discovered_at": "2025-01-01T00:00:00Z",
+        "total_agents": 1,
+        "total_reasoners": 1,
+        "total_skills": 0,
+        "pagination": {"limit": 5, "offset": 2, "has_more": False},
+        "capabilities": [
+            {
+                "agent_id": "agent-1",
+                "base_url": "http://agent",
+                "version": "1.0.0",
+                "health_status": "active",
+                "deployment_type": "long_running",
+                "last_heartbeat": "2025-01-01T00:00:00Z",
+                "reasoners": [
+                    {"id": "r1", "invocation_target": "agent-1:r1", "tags": ["ml"]}
+                ],
+                "skills": [],
+            }
+        ],
+    }
+    responses.add(
+        responses_lib.GET,
+        "http://localhost:8080/api/v1/discovery/capabilities",
+        json=payload,
+        status=200,
+    )
+
+    client = AgentFieldClient()
+    result = client.discover_capabilities(
+        agent="agent-1",
+        tags=["ml"],
+        include_input_schema=True,
+        limit=5,
+        offset=2,
+    )
+
+    assert isinstance(result.json, DiscoveryResponse)
+    assert result.json.total_agents == 1
+    called_url = responses.calls[0].request.url
+    assert "agent=agent-1" in called_url
+    assert "tags=ml" in called_url
+    assert "include_input_schema=true" in called_url
+    assert "limit=5" in called_url
+    assert "offset=2" in called_url
+
+
+def test_discover_capabilities_compact_and_xml(responses):
+    compact_payload = {
+        "discovered_at": "2025-01-01T00:00:00Z",
+        "reasoners": [{"id": "r1", "agent_id": "a1", "target": "a1:r1"}],
+        "skills": [],
+    }
+    responses.add(
+        responses_lib.GET,
+        "http://localhost:8080/api/v1/discovery/capabilities",
+        json=compact_payload,
+        status=200,
+    )
+    responses.add(
+        responses_lib.GET,
+        "http://localhost:8080/api/v1/discovery/capabilities",
+        body="<discovery/>",
+        status=200,
+        content_type="application/xml",
+    )
+
+    client = AgentFieldClient()
+
+    compact = client.discover_capabilities(format="compact")
+    assert compact.compact is not None
+    assert compact.compact.reasoners[0].id == "r1"
+
+    xml = client.discover_capabilities(format="xml")
+    assert xml.xml.startswith("<discovery")

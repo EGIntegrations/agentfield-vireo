@@ -252,23 +252,23 @@ class AgentAI:
             if processed_content:
                 messages.extend(processed_content)
 
-        try:
-            import litellm
-        except ImportError:
-            raise ImportError(
-                "litellm is not installed. Please install it with `pip install litellm`."
-            )
+        litellm_module = litellm if hasattr(litellm, "acompletion") else None
 
         # Ensure model limits are cached (done once per instance)
         await self._ensure_model_limits_cached()
 
-        # Apply prompt trimming using LiteLLM's token-aware utility instead of char-based limits
-        try:
-            from litellm.utils import token_counter, trim_messages
-        except ImportError:
-            raise ImportError(
-                "litellm is required for token-aware prompt trimming. Please install it with `pip install litellm`"
-            )
+        # Apply prompt trimming using LiteLLM's token-aware utility when available.
+        utils_module = getattr(litellm_module, "utils", None) if litellm_module else None
+        token_counter = getattr(utils_module, "token_counter", None) if utils_module else None
+        trim_messages = getattr(utils_module, "trim_messages", None) if utils_module else None
+
+        if token_counter is None:
+            def token_counter(model: str, messages: list[dict]) -> int:
+                return len(json.dumps(messages))
+
+        if trim_messages is None:
+            def trim_messages(messages: list[dict], model: str, max_tokens: int) -> list[dict]:
+                return messages
 
         # Determine model context length using multiple fallback strategies
         model_context_length = None
@@ -340,7 +340,11 @@ class AgentAI:
 
         # Define the LiteLLM call function for rate limiter
         async def _make_litellm_call():
-            return await litellm.acompletion(**litellm_params)
+            if litellm_module is None:
+                raise ImportError(
+                    "litellm is not installed. Please install it with `pip install litellm`."
+                )
+            return await litellm_module.acompletion(**litellm_params)
 
         async def _execute_with_fallbacks():
             # Check for configured fallback models in AI config
@@ -365,7 +369,7 @@ class AgentAI:
                                 f"Invalid model spec: '{m}'. Must include provider prefix, e.g. 'openai/gpt-4'."
                             )
                         litellm_params["model"] = m
-                        return await litellm.acompletion(**litellm_params)
+                        return await _make_litellm_call()
                     except Exception as e:
                         log_debug(
                             f"Model {m} failed with {e}, trying next fallback if available..."
@@ -821,11 +825,16 @@ class AgentAI:
         """
         Generate audio using LiteLLM's speech function for TTS models.
         """
-        import litellm
         from agentfield.multimodal_response import (
             AudioOutput,
             MultimodalResponse,
         )
+
+        litellm_module = litellm
+        if not hasattr(litellm_module, "aspeech"):
+            raise ImportError(
+                "litellm is not installed. Please install it with `pip install litellm` to use TTS features."
+            )
 
         # Combine all text inputs
         text_input = " ".join(str(arg) for arg in args if isinstance(arg, str))
@@ -837,7 +846,7 @@ class AgentAI:
             config = self.agent.ai_config.get_litellm_params()
 
             # Use LiteLLM speech function
-            response = await litellm.aspeech(
+            response = await litellm_module.aspeech(
                 model=model,
                 input=text_input,
                 voice=voice,

@@ -27,6 +27,50 @@ from .types import WebhookConfig
 logger = get_logger(__name__)
 
 
+class LazyAsyncLock:
+    """Deferred asyncio.Lock that instantiates once the event loop is running."""
+
+    def __init__(self):
+        self._lock: Optional[asyncio.Lock] = None
+
+    def _lock_obj(self) -> asyncio.Lock:
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
+
+    async def __aenter__(self):
+        return await self._lock_obj().__aenter__()
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return await self._lock_obj().__aexit__(exc_type, exc, tb)
+
+
+class LazySemaphore:
+    """Deferred asyncio.Semaphore that instantiates within the active loop."""
+
+    def __init__(self, size_factory):
+        self._size_factory = size_factory
+        self._sem: Optional[asyncio.Semaphore] = None
+
+    def _sem_obj(self) -> asyncio.Semaphore:
+        if self._sem is None:
+            self._sem = asyncio.Semaphore(max(1, int(self._size_factory())))
+        return self._sem
+
+    async def acquire(self):
+        return await self._sem_obj().acquire()
+
+    def release(self):
+        self._sem_obj().release()
+
+    async def __aenter__(self):
+        await self.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.release()
+
+
 @dataclass
 class PollingMetrics:
     """Metrics for polling performance monitoring."""
@@ -156,17 +200,20 @@ class AsyncExecutionManager:
 
         # Execution tracking
         self._executions: Dict[str, ExecutionState] = {}
-        self._execution_lock = asyncio.Lock()
-        capacity = max(1, self.config.max_concurrent_executions)
-        self._capacity_semaphore = asyncio.Semaphore(capacity)
+        self._execution_lock = LazyAsyncLock()
+        self._capacity_semaphore = LazySemaphore(
+            lambda: self.config.max_concurrent_executions
+        )
 
         # Event stream configuration
         self._event_stream_headers: Dict[str, str] = {}
 
         # Polling coordination
         self._polling_task: Optional[asyncio.Task] = None
-        self._polling_semaphore = asyncio.Semaphore(self.config.max_active_polls)
-        self._shutdown_event = asyncio.Event()
+        self._polling_semaphore = LazySemaphore(
+            lambda: self.config.max_active_polls
+        )
+        self._shutdown_event: Optional[asyncio.Event] = None
 
         # Metrics and monitoring
         self.metrics = ExecutionManagerMetrics()
@@ -217,6 +264,8 @@ class AsyncExecutionManager:
         await self.connection_manager.start()
         await self.result_cache.start()
 
+        if self._shutdown_event is None:
+            self._shutdown_event = asyncio.Event()
         self._shutdown_event.clear()
 
         # Start background tasks
@@ -240,6 +289,8 @@ class AsyncExecutionManager:
         logger.info("Stopping AsyncExecutionManager...")
 
         # Signal shutdown
+        if self._shutdown_event is None:
+            self._shutdown_event = asyncio.Event()
         self._shutdown_event.set()
 
         # Cancel background tasks

@@ -46,7 +46,12 @@ from agentfield.memory_events import MemoryEventClient
 from agentfield.logger import log_debug, log_error, log_info, log_warn
 from agentfield.router import AgentRouter
 from agentfield.connection_manager import ConnectionManager
-from agentfield.types import AgentStatus, AIConfig, MemoryConfig
+from agentfield.types import (
+    AgentStatus,
+    AIConfig,
+    DiscoveryResult,
+    MemoryConfig,
+)
 from agentfield.multimodal_response import MultimodalResponse
 from agentfield.async_config import AsyncConfig
 from agentfield.async_execution_manager import AsyncExecutionManager
@@ -3211,6 +3216,49 @@ class Agent(FastAPI):
         except Exception:
             # Ignore errors in destructor to prevent warnings during garbage collection
             pass
+
+    def discover(
+        self,
+        agent: Optional[str] = None,
+        node_id: Optional[str] = None,
+        agent_ids: Optional[List[str]] = None,
+        node_ids: Optional[List[str]] = None,
+        reasoner: Optional[str] = None,
+        skill: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        include_input_schema: bool = False,
+        include_output_schema: bool = False,
+        include_descriptions: bool = True,
+        include_examples: bool = False,
+        format: str = "json",
+        health_status: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> "DiscoveryResult":
+        """
+        Discover available agent capabilities from the control plane.
+        """
+
+        if not self.client:
+            raise RuntimeError("AgentField client is not configured")
+
+        return self.client.discover_capabilities(
+            agent=agent,
+            node_id=node_id,
+            agent_ids=agent_ids,
+            node_ids=node_ids,
+            reasoner=reasoner,
+            skill=skill,
+            tags=tags,
+            include_input_schema=include_input_schema,
+            include_output_schema=include_output_schema,
+            include_descriptions=include_descriptions,
+            include_examples=include_examples,
+            format=format,
+            health_status=health_status,
+            limit=limit,
+            offset=offset,
+        )
 
     def run(self, **serve_kwargs):
         """

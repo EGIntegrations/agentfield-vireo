@@ -121,6 +121,162 @@ class WebhookConfig:
         return payload
 
 
+# -----------------------------------------------------------------------------
+# Discovery API Models
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class DiscoveryPagination:
+    limit: int
+    offset: int
+    has_more: bool
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DiscoveryPagination":
+        return cls(
+            limit=int(data.get("limit", 0)),
+            offset=int(data.get("offset", 0)),
+            has_more=bool(data.get("has_more", False)),
+        )
+
+
+@dataclass
+class ReasonerCapability:
+    id: str
+    description: Optional[str]
+    tags: List[str]
+    input_schema: Optional[Dict[str, Any]]
+    output_schema: Optional[Dict[str, Any]]
+    examples: Optional[List[Dict[str, Any]]]
+    invocation_target: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ReasonerCapability":
+        return cls(
+            id=data.get("id", ""),
+            description=data.get("description"),
+            tags=list(data.get("tags") or []),
+            input_schema=data.get("input_schema"),
+            output_schema=data.get("output_schema"),
+            examples=[dict(x) for x in data.get("examples") or []] or None,
+            invocation_target=data.get("invocation_target", ""),
+        )
+
+
+@dataclass
+class SkillCapability:
+    id: str
+    description: Optional[str]
+    tags: List[str]
+    input_schema: Optional[Dict[str, Any]]
+    invocation_target: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SkillCapability":
+        return cls(
+            id=data.get("id", ""),
+            description=data.get("description"),
+            tags=list(data.get("tags") or []),
+            input_schema=data.get("input_schema"),
+            invocation_target=data.get("invocation_target", ""),
+        )
+
+
+@dataclass
+class AgentCapability:
+    agent_id: str
+    base_url: str
+    version: str
+    health_status: str
+    deployment_type: str
+    last_heartbeat: str
+    reasoners: List[ReasonerCapability] = field(default_factory=list)
+    skills: List[SkillCapability] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentCapability":
+        return cls(
+            agent_id=data.get("agent_id", ""),
+            base_url=data.get("base_url", ""),
+            version=data.get("version", ""),
+            health_status=data.get("health_status", ""),
+            deployment_type=data.get("deployment_type", ""),
+            last_heartbeat=data.get("last_heartbeat", ""),
+            reasoners=[
+                ReasonerCapability.from_dict(r) for r in data.get("reasoners") or []
+            ],
+            skills=[SkillCapability.from_dict(s) for s in data.get("skills") or []],
+        )
+
+
+@dataclass
+class DiscoveryResponse:
+    discovered_at: str
+    total_agents: int
+    total_reasoners: int
+    total_skills: int
+    pagination: DiscoveryPagination
+    capabilities: List[AgentCapability]
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DiscoveryResponse":
+        return cls(
+            discovered_at=str(data.get("discovered_at", "")),
+            total_agents=int(data.get("total_agents", 0)),
+            total_reasoners=int(data.get("total_reasoners", 0)),
+            total_skills=int(data.get("total_skills", 0)),
+            pagination=DiscoveryPagination.from_dict(data.get("pagination") or {}),
+            capabilities=[
+                AgentCapability.from_dict(cap)
+                for cap in data.get("capabilities") or []
+            ],
+        )
+
+
+@dataclass
+class CompactCapability:
+    id: str
+    agent_id: str
+    target: str
+    tags: List[str]
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CompactCapability":
+        return cls(
+            id=data.get("id", ""),
+            agent_id=data.get("agent_id", ""),
+            target=data.get("target", ""),
+            tags=list(data.get("tags") or []),
+        )
+
+
+@dataclass
+class CompactDiscoveryResponse:
+    discovered_at: str
+    reasoners: List[CompactCapability]
+    skills: List[CompactCapability]
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CompactDiscoveryResponse":
+        return cls(
+            discovered_at=str(data.get("discovered_at", "")),
+            reasoners=[
+                CompactCapability.from_dict(r) for r in data.get("reasoners") or []
+            ],
+            skills=[CompactCapability.from_dict(s) for s in data.get("skills") or []],
+        )
+
+
+@dataclass
+class DiscoveryResult:
+    format: str
+    raw: str
+    json: Optional[DiscoveryResponse] = None
+    compact: Optional[CompactDiscoveryResponse] = None
+    xml: Optional[str] = None
+
+
 class AIConfig(BaseModel):
     """
     Configuration for AI calls, defining default models, temperatures, and other parameters.

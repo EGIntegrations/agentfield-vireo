@@ -1,6 +1,14 @@
 from .agent import Agent
 from .router import AgentRouter
-from .types import AIConfig, MemoryConfig, ReasonerDefinition, SkillDefinition
+from .types import (
+    AIConfig,
+    CompactDiscoveryResponse,
+    DiscoveryResponse,
+    DiscoveryResult,
+    MemoryConfig,
+    ReasonerDefinition,
+    SkillDefinition,
+)
 from .multimodal import (
     Text,
     Image,
@@ -29,6 +37,9 @@ __all__ = [
     "MemoryConfig",
     "ReasonerDefinition",
     "SkillDefinition",
+    "DiscoveryResponse",
+    "CompactDiscoveryResponse",
+    "DiscoveryResult",
     "AgentRouter",
     # Input multimodal classes
     "Text",

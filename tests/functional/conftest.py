@@ -10,7 +10,7 @@ import os
 import time
 import uuid
 from pathlib import Path
-from typing import AsyncGenerator, Callable, Dict, Generator, Optional
+from typing import AsyncGenerator, Callable, Dict, Optional
 
 import httpx
 import pytest

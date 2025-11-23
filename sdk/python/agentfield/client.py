@@ -9,7 +9,14 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 import requests
 
-from .types import AgentStatus, HeartbeatData, WebhookConfig
+from .types import (
+    AgentStatus,
+    CompactDiscoveryResponse,
+    DiscoveryResponse,
+    DiscoveryResult,
+    HeartbeatData,
+    WebhookConfig,
+)
 from .async_config import AsyncConfig
 from .execution_state import ExecutionStatus
 from .result_cache import ResultCache
@@ -171,6 +178,107 @@ class AgentFieldClient:
             self._async_execution_manager.set_event_stream_headers(
                 self._latest_event_stream_headers
             )
+
+    def discover_capabilities(
+        self,
+        *,
+        agent: Optional[str] = None,
+        node_id: Optional[str] = None,
+        agent_ids: Optional[List[str]] = None,
+        node_ids: Optional[List[str]] = None,
+        reasoner: Optional[str] = None,
+        skill: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        include_input_schema: Optional[bool] = None,
+        include_output_schema: Optional[bool] = None,
+        include_descriptions: Optional[bool] = None,
+        include_examples: Optional[bool] = None,
+        format: str = "json",
+        health_status: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> DiscoveryResult:
+        """
+        Query the control plane discovery API.
+        """
+
+        fmt = (format or "json").lower()
+        params: Dict[str, str] = {"format": fmt}
+
+        def _dedupe(values: Optional[List[str]]) -> List[str]:
+            if not values:
+                return []
+            seen = set()
+            out: List[str] = []
+            for value in values:
+                if not value or value in seen:
+                    continue
+                seen.add(value)
+                out.append(value)
+            return out
+
+        combined_agent_ids = _dedupe(
+            ([agent] if agent else [])
+            + ([node_id] if node_id else [])
+            + (agent_ids or [])
+            + (node_ids or [])
+        )
+
+        if len(combined_agent_ids) == 1:
+            params["agent"] = combined_agent_ids[0]
+        elif len(combined_agent_ids) > 1:
+            params["agent_ids"] = ",".join(combined_agent_ids)
+
+        if reasoner:
+            params["reasoner"] = reasoner
+        if skill:
+            params["skill"] = skill
+        if tags:
+            params["tags"] = ",".join(_dedupe(tags))
+
+        if include_input_schema is not None:
+            params["include_input_schema"] = str(bool(include_input_schema)).lower()
+        if include_output_schema is not None:
+            params["include_output_schema"] = str(bool(include_output_schema)).lower()
+        if include_descriptions is not None:
+            params["include_descriptions"] = str(bool(include_descriptions)).lower()
+        if include_examples is not None:
+            params["include_examples"] = str(bool(include_examples)).lower()
+        if health_status:
+            params["health_status"] = health_status.lower()
+        if limit is not None:
+            params["limit"] = str(limit)
+        if offset is not None:
+            params["offset"] = str(offset)
+
+        request_headers = self._get_headers_with_context(headers)
+        request_headers["Accept"] = (
+            "application/xml" if fmt == "xml" else "application/json"
+        )
+        sanitized_headers = self._sanitize_header_values(request_headers)
+
+        response = requests.get(
+            f"{self.api_base}/discovery/capabilities",
+            params=params,
+            headers=sanitized_headers,
+            timeout=self.async_config.polling_timeout,
+        )
+        response.raise_for_status()
+
+        raw_body = response.text
+        if fmt == "xml":
+            return DiscoveryResult(format=fmt, raw=raw_body, xml=raw_body)
+
+        payload = response.json()
+        if fmt == "compact":
+            compact = CompactDiscoveryResponse.from_dict(payload)
+            return DiscoveryResult(
+                format=fmt, raw=raw_body, compact=compact, json=None
+            )
+
+        json_payload = DiscoveryResponse.from_dict(payload)
+        return DiscoveryResult(format="json", raw=raw_body, json=json_payload)
 
     async def get_async_http_client(self) -> "httpx.AsyncClient":
         """Lazily create and return a shared httpx.AsyncClient."""

@@ -236,6 +236,7 @@ type HealthStatus string
 const (
 	HealthStatusActive   HealthStatus = "active"
 	HealthStatusInactive HealthStatus = "inactive"
+	HealthStatusDegraded HealthStatus = "degraded"
 	HealthStatusUnknown  HealthStatus = "unknown"
 )
 

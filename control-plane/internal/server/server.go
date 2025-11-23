@@ -842,6 +842,12 @@ func (s *AgentFieldServer) setupRoutes() {
 		// Health check endpoint for container orchestration
 		agentAPI.GET("/health", s.healthCheckHandler)
 
+		// Discovery endpoints
+		discovery := agentAPI.Group("/discovery")
+		{
+			discovery.GET("/capabilities", handlers.DiscoveryCapabilitiesHandler(s.storage))
+		}
+
 		// Node management endpoints
 		agentAPI.POST("/nodes/register", handlers.RegisterNodeHandler(s.storage, s.uiService, s.didService, s.presenceManager))
 		agentAPI.POST("/nodes", handlers.RegisterNodeHandler(s.storage, s.uiService, s.didService, s.presenceManager))
