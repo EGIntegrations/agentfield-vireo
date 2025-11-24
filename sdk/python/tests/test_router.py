@@ -15,6 +15,14 @@ class DummyAgent:
         self.calls.append((target, args, kwargs))
         return "call-result"
 
+    def note(self, message: str, tags=None):
+        self.calls.append(("note", (message,), {"tags": tags}))
+        return "note-logged"
+
+    def discover(self, **kwargs):
+        self.calls.append(("discover", (), kwargs))
+        return "discovery-result"
+
     @property
     def memory(self):
         return "memory-client"
@@ -92,3 +100,43 @@ def test_router_supports_parentheses_free_decorators():
 def test_combine_path(prefix, default, custom, expected):
     router = AgentRouter(prefix=prefix)
     assert router._combine_path(default, custom) == expected
+
+
+def test_router_automatic_delegation():
+    """Test that AgentRouter automatically delegates all Agent methods via __getattr__."""
+    router = AgentRouter()
+    agent = DummyAgent()
+    router._attach_agent(agent)
+
+    # Test note() delegation (the original issue)
+    note_result = router.note("Test message", tags=["debug"])
+    assert note_result == "note-logged"
+    assert agent.calls[-1] == ("note", ("Test message",), {"tags": ["debug"]})
+
+    # Test discover() delegation (future-proofing)
+    discover_result = router.discover(agent="test_agent", tags=["api"])
+    assert discover_result == "discovery-result"
+    assert agent.calls[-1] == ("discover", (), {"agent": "test_agent", "tags": ["api"]})
+
+    # Test property access (memory)
+    assert router.memory == "memory-client"
+
+    # Test app property
+    assert router.app is agent
+
+
+def test_router_delegation_without_agent_raises_error():
+    """Test that accessing delegated methods without an attached agent raises RuntimeError."""
+    router = AgentRouter()
+
+    # Test that note() raises RuntimeError when no agent is attached
+    with pytest.raises(RuntimeError, match="Router not attached to an agent"):
+        router.note("Test message")
+
+    # Test that discover() raises RuntimeError when no agent is attached
+    with pytest.raises(RuntimeError, match="Router not attached to an agent"):
+        router.discover()
+
+    # Test that memory raises RuntimeError when no agent is attached
+    with pytest.raises(RuntimeError, match="Router not attached to an agent"):
+        _ = router.memory

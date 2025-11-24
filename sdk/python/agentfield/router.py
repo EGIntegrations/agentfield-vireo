@@ -98,33 +98,52 @@ class AgentRouter:
         return decorator
 
     # ------------------------------------------------------------------
-    # Agent delegation helpers
-    async def ai(self, *args: Any, **kwargs: Any) -> Any:
-        agent = self._require_agent()
-        return await agent.ai(*args, **kwargs)
+    # Automatic delegation via __getattr__
+    def __getattr__(self, name: str) -> Any:
+        """
+        Automatically delegate any unknown attribute/method to the attached agent.
 
-    async def call(self, target: str, *args: Any, **kwargs: Any) -> Any:
-        agent = self._require_agent()
-        return await agent.call(target, *args, **kwargs)
+        This allows AgentRouter to transparently proxy all Agent methods (like ai(),
+        call(), memory, note(), discover(), etc.) without explicitly defining
+        delegation methods for each one.
 
-    @property
-    def memory(self):  # type: ignore[override]
-        agent = self._require_agent()
-        return agent.memory
+        Args:
+            name: The attribute/method name being accessed
+
+        Returns:
+            The attribute/method from the attached agent
+
+        Raises:
+            RuntimeError: If router is not attached to an agent
+            AttributeError: If the agent doesn't have the requested attribute
+        """
+        # Avoid infinite recursion by accessing _agent through object.__getattribute__
+        try:
+            agent = object.__getattribute__(self, '_agent')
+        except AttributeError:
+            raise RuntimeError(
+                "Router not attached to an agent. Call Agent.include_router(router) first."
+            )
+
+        if agent is None:
+            raise RuntimeError(
+                "Router not attached to an agent. Call Agent.include_router(router) first."
+            )
+
+        # Delegate to the agent - will raise AttributeError if not found
+        return getattr(agent, name)
 
     @property
     def app(self) -> "Agent":
         """Access the underlying Agent instance."""
-        return self._require_agent()
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    def _require_agent(self) -> "Agent":
         if not self._agent:
             raise RuntimeError(
                 "Router not attached to an agent. Call Agent.include_router(router) first."
             )
         return self._agent
+
+    # ------------------------------------------------------------------
+    # Internal helpers
 
     def _combine_path(
         self,
