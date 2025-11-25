@@ -2,6 +2,8 @@ import { Agent } from '../src/agent/Agent.js';
 import { AgentRouter } from '../src/router/AgentRouter.js';
 import { z } from 'zod';
 
+console.log('Starting simulation example...');
+
 const simulationRouter = new AgentRouter({ prefix: 'simulation' });
 
 const SimulationResultSchema = z.object({
@@ -26,8 +28,8 @@ simulationRouter.reasoner<{
 }, SimulationResult>('runSimulation', async (ctx) => {
   const { scenario, populationSize, context = [], parallelBatchSize = 20 } = ctx.input;
 
-  const scenarioAnalysis = await ctx.ai(`Analyze scenario: ${scenario}`);
-  const factorGraph = await ctx.ai(`Build factor graph: ${scenarioAnalysis}`);
+  const scenarioAnalysis = await safeAI(ctx, `Analyze scenario: ${scenario}`);
+  const factorGraph = await safeAI(ctx, `Build factor graph: ${scenarioAnalysis}`);
 
   await ctx.memory.set('last_scenario', { scenario, factorGraph });
 
@@ -44,12 +46,13 @@ simulationRouter.reasoner<{
 });
 
 simulationRouter.reasoner<{ scenario: string }, any>('decomposeScenario', async (ctx) => {
-  return ctx.ai(`Decompose: ${ctx.input.scenario}`);
+  return safeAI(ctx, `Decompose: ${ctx.input.scenario}`);
 });
 
 const agent = new Agent({
   nodeId: 'simulation-engine',
   aiConfig: { model: 'gpt-4o', provider: 'openai' },
+  host: '127.0.0.1',
   devMode: true
 });
 
@@ -59,6 +62,21 @@ agent.reasoner<{ message: string }, { echo: string }>('echo', async (ctx) => ({
   echo: ctx.input.message
 }));
 
-agent.serve().then(() => {
-  console.log('Simulation agent serving on port 8001');
-});
+agent
+  .serve()
+  .then(() => {
+    console.log('Simulation agent serving on port 8001');
+  })
+  .catch((err) => {
+    console.error('Failed to start simulation agent', err);
+    process.exit(1);
+  });
+
+async function safeAI(ctx: any, prompt: string) {
+  try {
+    return await ctx.ai(prompt);
+  } catch (err) {
+    console.warn('AI call failed, returning stub text. Set OPENAI_API_KEY to enable real calls.', err);
+    return `stub: ${prompt}`;
+  }
+}

@@ -12,7 +12,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "example:simulation": "npm run build -- --silent && node dist/examples/simulation.js"
   },
   "exports": {
     ".": {
@@ -36,6 +37,8 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.0",
     "@types/ws": "^8.5.10",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"

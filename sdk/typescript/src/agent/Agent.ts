@@ -34,6 +34,7 @@ export class Agent {
     this.config = {
       port: 8001,
       agentFieldUrl: 'http://localhost:8080',
+      host: '0.0.0.0',
       ...config
     };
 
@@ -94,8 +95,12 @@ export class Agent {
 
   async serve(): Promise<void> {
     await this.registerWithControlPlane();
-    await new Promise<void>((resolve) => {
-      this.server = this.app.listen(this.config.port, () => resolve());
+    const port = this.config.port ?? 8001;
+    const host = this.config.host ?? '0.0.0.0';
+    await new Promise<void>((resolve, reject) => {
+      this.server = this.app
+        .listen(port, host, () => resolve())
+        .on('error', reject);
     });
     this.memoryEventClient.start();
     this.startHeartbeat();

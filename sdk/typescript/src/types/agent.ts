@@ -8,6 +8,7 @@ export interface AgentConfig {
   teamId?: string;
   agentFieldUrl?: string;
   port?: number;
+  host?: string;
   publicUrl?: string;
   aiConfig?: AIConfig;
   memoryConfig?: MemoryConfig;
