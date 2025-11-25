@@ -44,3 +44,6 @@ reports/
 
 # Docker
 .docker/
+
+# Typescript
+.env
