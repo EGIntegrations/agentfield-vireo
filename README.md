@@ -359,7 +359,7 @@ If you are **Backend Engineers** shipping AI into production who want standard A
 
 - **[Documentation](https://agentfield.ai/docs)**
 - **[GitHub Issues](https://github.com/Agent-Field/agentfield/issues)**
-- **[Twitter/X](https://x.com/agentfield_dev)**
+- **[Twitter/X](https://x.com/agentfield_ai)**
 - **[Examples](https://agentfield.ai/examples)**
 
 <p align="center">
