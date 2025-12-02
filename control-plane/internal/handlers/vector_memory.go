@@ -22,6 +22,12 @@ type DeleteVectorRequest struct {
 	Scope *string `json:"scope,omitempty"`
 }
 
+// DeleteNamespaceRequest removes all vectors by namespace prefix.
+type DeleteNamespaceRequest struct {
+	Namespace string  `json:"namespace" binding:"required"`
+	Scope     *string `json:"scope,omitempty"`
+}
+
 // VectorSearchRequest describes a similarity search query.
 type VectorSearchRequest struct {
 	QueryEmbedding []float32              `json:"query_embedding" binding:"required"`
@@ -104,6 +110,49 @@ func DeleteVectorHandler(storage MemoryStorage) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
+	}
+}
+
+// DeleteNamespaceVectorsHandler removes all vectors whose keys start with the namespace prefix.
+func DeleteNamespaceVectorsHandler(storage MemoryStorage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req DeleteNamespaceRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "invalid_request",
+				Message: err.Error(),
+				Code:    http.StatusBadRequest,
+			})
+			return
+		}
+		if req.Namespace == "" {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "invalid_request",
+				Message: "namespace is required",
+				Code:    http.StatusBadRequest,
+			})
+			return
+		}
+
+		scope, scopeID := resolveScope(c, req.Scope)
+		deleted, err := storage.DeleteVectorsByPrefix(c.Request.Context(), scope, scopeID, req.Namespace)
+		if err != nil {
+			logger.Logger.Error().Err(err).Msg("failed to delete namespace vectors")
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "storage_error",
+				Message: err.Error(),
+				Code:    http.StatusInternalServerError,
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"namespace": req.Namespace,
+			"deleted":   deleted,
+			"scope":     scope,
+			"scope_id":  scopeID,
+			"status":    "deleted",
+		})
 	}
 }
 

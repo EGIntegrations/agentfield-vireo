@@ -104,6 +104,10 @@ func (m *memoryStorageStub) DeleteVector(ctx context.Context, scope, scopeID, ke
 	return nil
 }
 
+func (m *memoryStorageStub) DeleteVectorsByPrefix(ctx context.Context, scope, scopeID, prefix string) (int, error) {
+	return 0, nil
+}
+
 func (m *memoryStorageStub) SimilaritySearch(ctx context.Context, scope, scopeID string, queryEmbedding []float32, topK int, filters map[string]interface{}) ([]*types.VectorSearchResult, error) {
 	return []*types.VectorSearchResult{}, nil
 }

@@ -3792,6 +3792,17 @@ func (ls *LocalStorage) DeleteVector(ctx context.Context, scope, scopeID, key st
 	return ls.vectorStore.Delete(ctx, scope, scopeID, key)
 }
 
+// DeleteVectorsByPrefix deletes all vectors whose key starts with the given prefix.
+func (ls *LocalStorage) DeleteVectorsByPrefix(ctx context.Context, scope, scopeID, prefix string) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	if err := ls.requireVectorStore(); err != nil {
+		return 0, err
+	}
+	return ls.vectorStore.DeleteByPrefix(ctx, scope, scopeID, prefix)
+}
+
 // SimilaritySearch performs a similarity search within a scope using the configured vector backend.
 func (ls *LocalStorage) SimilaritySearch(ctx context.Context, scope, scopeID string, queryEmbedding []float32, topK int, filters map[string]interface{}) ([]*types.VectorSearchResult, error) {
 	if err := ctx.Err(); err != nil {

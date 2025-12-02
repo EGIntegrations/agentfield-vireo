@@ -74,6 +74,26 @@ func (s *postgresVectorStore) Delete(ctx context.Context, scope, scopeID, key st
 	return err
 }
 
+func (s *postgresVectorStore) DeleteByPrefix(ctx context.Context, scope, scopeID, prefix string) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM memory_vectors
+		WHERE scope = ? AND scope_id = ? AND key LIKE ?
+	`, scope, scopeID, prefix+"%")
+	if err != nil {
+		return 0, err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(rows), nil
+}
+
 func (s *postgresVectorStore) Search(ctx context.Context, scope, scopeID string, query []float32, topK int, filters map[string]interface{}) ([]*types.VectorSearchResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

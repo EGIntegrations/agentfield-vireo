@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from agentfield import AgentRouter
@@ -11,7 +12,43 @@ from chunking import chunk_markdown_text, is_supported_file, read_text
 from embedding import embed_texts
 from schemas import IngestReport
 
+try:
+    import httpx
+except ImportError:  # pragma: no cover - httpx is installed in runtime environments
+    httpx = None
+
 ingestion_router = AgentRouter(tags=["ingestion"])
+
+
+async def _clear_namespace_via_api(namespace: str) -> dict:
+    """Call control plane delete-namespace endpoint."""
+    if httpx is None:
+        raise RuntimeError("httpx is required for clear_namespace")
+
+    base_url = os.getenv("CONTROL_PLANE_URL") or os.getenv("AGENTFIELD_SERVER") or ""
+    base_url = base_url.rstrip("/")
+    if not base_url:
+        raise ValueError("CONTROL_PLANE_URL (or AGENTFIELD_SERVER) is required to clear namespace")
+
+    api_key = os.getenv("CONTROL_PLANE_API_KEY") or os.getenv("AGENTFIELD_API_KEY")
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    url = f"{base_url}/api/v1/memory/vector/namespace"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.delete(url, json={"namespace": namespace}, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
+
+
+@ingestion_router.skill()
+async def clear_namespace(namespace: str = "documentation") -> dict:
+    """Wipe all vectors for a namespace before re-indexing."""
+    result = await _clear_namespace_via_api(namespace)
+    deleted = result.get("deleted", 0)
+    log_info(f"Cleared namespace '{namespace}' (deleted {deleted} vectors)")
+    return {"namespace": namespace, "deleted": deleted}
 
 
 @ingestion_router.reasoner()

@@ -918,6 +918,7 @@ func (s *AgentFieldServer) setupRoutes() {
 		agentAPI.POST("/memory/vector/set", handlers.SetVectorHandler(s.storage))
 		agentAPI.POST("/memory/vector/search", handlers.SimilaritySearchHandler(s.storage))
 		agentAPI.POST("/memory/vector/delete", handlers.DeleteVectorHandler(s.storage))
+		agentAPI.DELETE("/memory/vector/namespace", handlers.DeleteNamespaceVectorsHandler(s.storage))
 
 		// Memory events endpoints
 		memoryEventsHandler := handlers.NewMemoryEventsHandler(s.storage)

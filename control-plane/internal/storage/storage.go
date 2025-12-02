@@ -88,6 +88,7 @@ type StorageProvider interface {
 	ListMemory(ctx context.Context, scope, scopeID string) ([]*types.Memory, error)
 	SetVector(ctx context.Context, record *types.VectorRecord) error
 	DeleteVector(ctx context.Context, scope, scopeID, key string) error
+	DeleteVectorsByPrefix(ctx context.Context, scope, scopeID, prefix string) (int, error)
 	SimilaritySearch(ctx context.Context, scope, scopeID string, queryEmbedding []float32, topK int, filters map[string]interface{}) ([]*types.VectorSearchResult, error)
 
 	// Event operations
