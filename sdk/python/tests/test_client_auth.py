@@ -6,7 +6,6 @@ import sys
 import types
 
 import pytest
-import requests
 
 from agentfield.client import AgentFieldClient
 
@@ -231,7 +230,7 @@ class TestAPIKeyAuthentication:
         monkeypatch.setattr(client_mod.requests, "get", fake_get)
 
         client = AgentFieldClient(base_url="http://example.com", api_key="discover-key")
-        result = client.discover_capabilities()
+        client.discover_capabilities()
 
         assert captured["headers"]["X-API-Key"] == "discover-key"
 
