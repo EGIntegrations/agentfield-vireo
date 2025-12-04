@@ -6,6 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 <!-- changelog:entries -->
 
+## [0.1.20-rc.2] - 2025-12-04
+
+
+### Added
+
+- Feat(release): unify PyPI publishing for all releases (#58)
+
+Publish all Python SDK releases (both prerelease and stable) to PyPI
+instead of using TestPyPI for prereleases.
+
+Per PEP 440, prerelease versions (e.g., 0.1.20rc1) are excluded by
+default from `pip install` - users must explicitly use `--pre` flag.
+This simplifies the release process and removes the need for the
+TEST_PYPI_API_TOKEN secret.
+
+Changes:
+- Merge TestPyPI and PyPI publish steps into single PyPI step
+- Update release notes to show `pip install --pre` for staging
+- Update install.sh staging output
+- Re-enable example requirements updates for prereleases
+- Update RELEASE.md documentation
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-authored-by: Claude <noreply@anthropic.com> (ebf7020)
+
+
+
+### Fixed
+
+- Fix(release): fix example requirements and prevent future staging bumps (#56)
+
+* fix(examples): revert to stable agentfield version (0.1.19)
+
+The staging release bumped example requirements to 0.1.20-rc.1, but
+RC versions are published to TestPyPI, not PyPI. This caused Railway
+deployments to fail because pip couldn't find the package.
+
+Revert to the last stable version (0.1.19) which is available on PyPI.
+
+* fix(release): skip example requirements bump for prerelease versions
+
+Prerelease versions are published to TestPyPI, not PyPI. If we bump
+example requirements.txt files to require a prerelease version,
+Railway deployments will fail because pip looks at PyPI by default.
+
+Now bump_version.py only updates example requirements for stable
+releases, ensuring deployed examples always use versions available
+on PyPI. (c86bec5)
+
 ## [0.1.20-rc.1] - 2025-12-04
 
 
