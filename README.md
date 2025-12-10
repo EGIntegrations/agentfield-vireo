@@ -19,13 +19,9 @@
 
 </div>
 
----
 
-> **Early Adopter?**
->
-> You've discovered AgentField before our official launch. We're in private beta, gathering feedback from developers building production agent systems. Explore, test, and share feedback via [GitHub Issues](https://github.com/Agent-Field/agentfield/issues) or email us at contact@agentfield.ai.
 
----
+
 
 ## What is AgentField?
 
