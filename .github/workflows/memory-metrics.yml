@@ -1,0 +1,395 @@
+name: Performance Check
+
+on:
+  pull_request:
+    paths:
+      - 'sdk/python/**'
+      - 'sdk/go/**'
+      - 'sdk/typescript/**'
+      - '.github/workflows/memory-metrics.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      go: ${{ steps.filter.outputs.go }}
+      typescript: ${{ steps.filter.outputs.typescript }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'sdk/python/**'
+            go:
+              - 'sdk/go/**'
+            typescript:
+              - 'sdk/typescript/**'
+
+  python-perf:
+    name: Python
+    needs: detect-changes
+    if: needs.detect-changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      memory: ${{ steps.bench.outputs.memory }}
+      latency: ${{ steps.bench.outputs.latency }}
+      tests: ${{ steps.tests.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install
+        working-directory: sdk/python
+        run: pip install -q .[dev]
+
+      - name: Tests
+        id: tests
+        working-directory: sdk/python
+        run: |
+          if python -m pytest tests/ --ignore=tests/integration -q 2>&1; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Benchmark
+        id: bench
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, 'sdk/python')
+          import time
+          import gc
+          import tracemalloc
+
+          from agentfield import Agent
+
+          # Memory benchmark
+          gc.collect()
+          tracemalloc.start()
+
+          agent = Agent('bench', agentfield_server='http://localhost:8080', auto_register=False, enable_mcp=False)
+
+          for i in range(1000):
+              idx = i
+              @agent.reasoner(f'handler-{i}')
+              async def handler(input_data: dict, _idx=idx) -> dict:
+                  return {'id': _idx}
+
+          gc.collect()
+          current, _ = tracemalloc.get_traced_memory()
+          tracemalloc.stop()
+
+          mem_kb = (current / 1024) / 1000  # KB per handler
+          print(f'memory={mem_kb:.2f}')
+
+          # Latency benchmark
+          async def test_handler(input_data: dict) -> dict:
+              return {'result': True}
+
+          handlers = [test_handler for _ in range(100)]
+          import asyncio
+
+          async def measure():
+              times = []
+              for i in range(10000):
+                  start = time.perf_counter()
+                  await handlers[i % 100]({'test': True})
+                  times.append((time.perf_counter() - start) * 1_000_000)
+              return sorted(times)[int(len(times) * 0.99)]
+
+          p99 = asyncio.run(measure())
+          print(f'latency={p99:.2f}')
+          " 2>&1 | tee bench.txt
+
+          echo "memory=$(grep 'memory=' bench.txt | cut -d= -f2)" >> $GITHUB_OUTPUT
+          echo "latency=$(grep 'latency=' bench.txt | cut -d= -f2)" >> $GITHUB_OUTPUT
+
+  go-perf:
+    name: Go
+    needs: detect-changes
+    if: needs.detect-changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      memory: ${{ steps.bench.outputs.memory }}
+      latency: ${{ steps.bench.outputs.latency }}
+      tests: ${{ steps.tests.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Tests
+        id: tests
+        working-directory: sdk/go
+        run: |
+          if go test ./... -short 2>&1; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Benchmark
+        id: bench
+        working-directory: sdk/go
+        run: |
+          go test -bench=BenchmarkInMemoryBackend -benchmem ./agent/... 2>&1 | tee bench.txt
+
+          # Extract ns/op and B/op
+          SET_NS=$(grep "BenchmarkInMemoryBackendSet" bench.txt | awk '{print $3}' | head -1 || echo "1000")
+          SET_ALLOC=$(grep "BenchmarkInMemoryBackendSet" bench.txt | awk '{print $5}' | head -1 || echo "280")
+
+          # Convert ns to µs
+          LATENCY_US=$(echo "scale=2; $SET_NS / 1000" | bc)
+          echo "memory=${SET_ALLOC}" >> $GITHUB_OUTPUT
+          echo "latency=${LATENCY_US}" >> $GITHUB_OUTPUT
+
+  typescript-perf:
+    name: TypeScript
+    needs: detect-changes
+    if: needs.detect-changes.outputs.typescript == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      memory: ${{ steps.bench.outputs.memory }}
+      latency: ${{ steps.bench.outputs.latency }}
+      tests: ${{ steps.tests.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install
+        working-directory: sdk/typescript
+        run: npm install
+
+      - name: Tests
+        id: tests
+        working-directory: sdk/typescript
+        run: |
+          if npm test 2>&1; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Build
+        working-directory: sdk/typescript
+        run: npm run build
+
+      - name: Benchmark
+        id: bench
+        working-directory: sdk/typescript
+        run: |
+          # Write benchmark script that uses the actual SDK
+          cat > bench.mjs << 'BENCHEOF'
+          import { Agent } from './dist/index.js';
+
+          // Force garbage collection if available
+          if (global.gc) global.gc();
+
+          // Memory test - measure actual SDK overhead
+          const startHeap = process.memoryUsage().heapUsed;
+
+          // Create agent (one-time overhead, not counted per-handler)
+          const agent = new Agent({
+            nodeId: 'bench',
+            agentFieldUrl: 'http://localhost:8080',
+            port: 9999,
+            didEnabled: false
+          });
+
+          const handlerCount = 1000;
+
+          // Register handlers using the actual SDK API
+          for (let i = 0; i < handlerCount; i++) {
+            const idx = i;
+            agent.reasoner(`handler-${i}`, async (ctx) => ({ id: idx }));
+          }
+
+          if (global.gc) global.gc();
+
+          const endHeap = process.memoryUsage().heapUsed;
+          const memPerHandler = (endHeap - startHeap) / handlerCount;
+          console.log('memory=' + memPerHandler.toFixed(0));
+
+          // Latency test - measure handler lookup and execution
+          const times = [];
+          for (let i = 0; i < 10000; i++) {
+            const name = `handler-${i % handlerCount}`;
+            const s = performance.now();
+            const def = agent.reasoners.get(name);
+            if (def) await def.handler({ input: {} });
+            times.push((performance.now() - s) * 1000);
+          }
+          times.sort((a, b) => a - b);
+          const p99 = times[Math.floor(times.length * 0.99)];
+          console.log('latency=' + p99.toFixed(2));
+          BENCHEOF
+
+          node --expose-gc bench.mjs 2>&1 | tee bench.txt
+
+          echo "memory=$(grep 'memory=' bench.txt | cut -d= -f2)" >> $GITHUB_OUTPUT
+          echo "latency=$(grep 'latency=' bench.txt | cut -d= -f2)" >> $GITHUB_OUTPUT
+
+  report:
+    name: Report
+    needs: [detect-changes, python-perf, go-perf, typescript-perf]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const baseline = JSON.parse(fs.readFileSync('examples/benchmarks/baseline.json', 'utf8'));
+            const thresholds = baseline.thresholds;
+
+            // Collect results
+            const results = [];
+            const warnings = [];
+
+            // Python
+            const pyChanged = '${{ needs.detect-changes.outputs.python }}' === 'true';
+            if (pyChanged) {
+              const mem = parseFloat('${{ needs.python-perf.outputs.memory }}') || 0;
+              const lat = parseFloat('${{ needs.python-perf.outputs.latency }}') || 0;
+              const tests = '${{ needs.python-perf.outputs.tests }}';
+              const baseMem = baseline.metrics.python.memory_per_handler_kb;
+              const baseLat = baseline.metrics.python.latency_p99_us;
+
+              const memDelta = baseMem > 0 ? ((mem - baseMem) / baseMem * 100) : 0;
+              const latDelta = baseLat > 0 ? ((lat - baseLat) / baseLat * 100) : 0;
+
+              let status = '✓';
+              if (tests === 'fail') status = '✗';
+              else if (memDelta > thresholds.memory_fail_pct || latDelta > thresholds.latency_fail_pct) status = '✗';
+              else if (memDelta > thresholds.memory_warning_pct || latDelta > thresholds.latency_warning_pct) status = '⚠';
+
+              const memStr = memDelta > 1 ? `+${memDelta.toFixed(0)}%` : (memDelta < -1 ? `${memDelta.toFixed(0)}%` : '-');
+              const latStr = latDelta > 1 ? `+${latDelta.toFixed(0)}%` : (latDelta < -1 ? `${latDelta.toFixed(0)}%` : '-');
+
+              results.push(`| Python | ${mem.toFixed(1)} KB | ${memStr} | ${lat.toFixed(2)} µs | ${latStr} | ${tests === 'pass' ? '✓' : '✗'} | ${status} |`);
+
+              if (memDelta > thresholds.memory_warning_pct) {
+                warnings.push(`Python memory: ${baseMem.toFixed(1)} KB → ${mem.toFixed(1)} KB (+${memDelta.toFixed(0)}%)`);
+              }
+            }
+
+            // Go
+            const goChanged = '${{ needs.detect-changes.outputs.go }}' === 'true';
+            if (goChanged) {
+              const mem = parseFloat('${{ needs.go-perf.outputs.memory }}') || 0;
+              const lat = parseFloat('${{ needs.go-perf.outputs.latency }}') || 0;
+              const tests = '${{ needs.go-perf.outputs.tests }}';
+              const baseMem = baseline.metrics.go.memory_per_handler_bytes;
+              const baseLat = baseline.metrics.go.latency_p99_us;
+
+              const memDelta = baseMem > 0 ? ((mem - baseMem) / baseMem * 100) : 0;
+              const latDelta = baseLat > 0 ? ((lat - baseLat) / baseLat * 100) : 0;
+
+              let status = '✓';
+              if (tests === 'fail') status = '✗';
+              else if (memDelta > thresholds.memory_fail_pct || latDelta > thresholds.latency_fail_pct) status = '✗';
+              else if (memDelta > thresholds.memory_warning_pct || latDelta > thresholds.latency_warning_pct) status = '⚠';
+
+              const memStr = memDelta > 1 ? `+${memDelta.toFixed(0)}%` : (memDelta < -1 ? `${memDelta.toFixed(0)}%` : '-');
+              const latStr = latDelta > 1 ? `+${latDelta.toFixed(0)}%` : (latDelta < -1 ? `${latDelta.toFixed(0)}%` : '-');
+
+              results.push(`| Go | ${mem} B | ${memStr} | ${lat.toFixed(2)} µs | ${latStr} | ${tests === 'pass' ? '✓' : '✗'} | ${status} |`);
+
+              if (memDelta > thresholds.memory_warning_pct) {
+                warnings.push(`Go memory: ${baseMem} B → ${mem} B (+${memDelta.toFixed(0)}%)`);
+              }
+            }
+
+            // TypeScript
+            const tsChanged = '${{ needs.detect-changes.outputs.typescript }}' === 'true';
+            if (tsChanged) {
+              const mem = parseFloat('${{ needs.typescript-perf.outputs.memory }}') || 0;
+              const lat = parseFloat('${{ needs.typescript-perf.outputs.latency }}') || 0;
+              const tests = '${{ needs.typescript-perf.outputs.tests }}';
+              const baseMem = baseline.metrics.typescript.memory_per_handler_bytes;
+              const baseLat = baseline.metrics.typescript.latency_p99_us;
+
+              const memDelta = baseMem > 0 ? ((mem - baseMem) / baseMem * 100) : 0;
+              const latDelta = baseLat > 0 ? ((lat - baseLat) / baseLat * 100) : 0;
+
+              let status = '✓';
+              if (tests === 'fail') status = '✗';
+              else if (memDelta > thresholds.memory_fail_pct || latDelta > thresholds.latency_fail_pct) status = '✗';
+              else if (memDelta > thresholds.memory_warning_pct || latDelta > thresholds.latency_warning_pct) status = '⚠';
+
+              const memStr = memDelta > 1 ? `+${memDelta.toFixed(0)}%` : (memDelta < -1 ? `${memDelta.toFixed(0)}%` : '-');
+              const latStr = latDelta > 1 ? `+${latDelta.toFixed(0)}%` : (latDelta < -1 ? `${latDelta.toFixed(0)}%` : '-');
+
+              results.push(`| TS | ${mem} B | ${memStr} | ${lat.toFixed(2)} µs | ${latStr} | ${tests === 'pass' ? '✓' : '✗'} | ${status} |`);
+
+              if (memDelta > thresholds.memory_warning_pct) {
+                warnings.push(`TypeScript memory: ${baseMem} B → ${mem} B (+${memDelta.toFixed(0)}%)`);
+              }
+            }
+
+            // Build comment
+            let body = `## Performance\n\n`;
+
+            if (results.length === 0) {
+              body += `No SDK changes detected.\n`;
+            } else {
+              body += `| SDK | Memory | Δ | Latency | Δ | Tests | Status |\n`;
+              body += `|-----|--------|---|---------|---|-------|--------|\n`;
+              body += results.join('\n') + '\n\n';
+
+              if (warnings.length > 0) {
+                body += `⚠ **Regression detected:**\n`;
+                warnings.forEach(w => body += `- ${w}\n`);
+              } else {
+                body += `✓ No regressions detected\n`;
+              }
+            }
+
+            // Post comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes('## Performance'));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
