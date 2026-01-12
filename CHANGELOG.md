@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 <!-- changelog:entries -->
 
+## [0.1.31-rc.2] - 2026-01-12
+
+
+### Testing
+
+- Test(server): add tests for public /health endpoint
+
+Add tests to verify:
+- /health bypasses API key authentication
+- /health returns healthy status with proper JSON response
+- /health returns CORS headers for cross-origin requests
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com> (4d96445)
+
 ## [0.1.31-rc.1] - 2026-01-12
 
 
