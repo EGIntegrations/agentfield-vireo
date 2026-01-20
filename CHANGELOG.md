@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 <!-- changelog:entries -->
 
+## [0.1.32-rc.3] - 2026-01-20
+
+
+### Other
+
+- Add skill execution data to observability events (#147)
+
+Include skill metadata in execution events when skills are invoked:
+- skill_id: explicit skill identifier
+- skill: skill schema (id, input_schema, tags)
+- agent_skills: all skills on the agent node
+
+This mirrors the existing pattern for reasoner data and enables
+downstream systems to track skill usage and execution metrics.
+
+Co-authored-by: Claude <noreply@anthropic.com> (584bf74)
+
+- Include input payload in execution events and add output schemas to reasoner examples (#146)
+
+- Include input payload in status update, completion, and failure events
+- Add explicit output schemas to analyzeSentiment and processWithNotes reasoners
+- Improves event data completeness for downstream consumers
+
+Co-authored-by: Claude <noreply@anthropic.com> (aae99c2)
+
+- Banner update (de723e3)
+
+- Update banner image (dc0ce8f)
+
+- Adds deep research banner to README
+
+Adds a visual banner for the "Deep Research API" to the README file.
+
+This enhances the visual appeal and branding of the project's main documentation page. (41b6ab7)
+
 ## [0.1.32-rc.2] - 2026-01-13
 
 
