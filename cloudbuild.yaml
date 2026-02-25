@@ -1,3 +1,7 @@
-logsBucket: gs://vireo-build-logs
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'us-central1-docker.pkg.dev/vireo-dev/agentfield/agentfield-control-plane:$COMMIT_SHA', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'us-central1-docker.pkg.dev/vireo-dev/agentfield/agentfield-control-plane:$COMMIT_SHA']
 options:
   logging: CLOUD_LOGGING_ONLY
