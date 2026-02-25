@@ -1,5 +1,3 @@
-steps:
-- name: gcr.io/cloud-builders/gcloud
-  args: ["version"]
+logsBucket: gs://vireo-build-logs
 options:
   logging: CLOUD_LOGGING_ONLY
